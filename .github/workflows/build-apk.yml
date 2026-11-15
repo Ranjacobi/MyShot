@@ -5,6 +5,9 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -52,6 +55,19 @@ jobs:
         with:
           name: MyShot-apk
           path: MyShot.apk
+
+      # Also publish the APK under Releases, so the phone can download it directly.
+      - name: Publish to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG="build-${GITHUB_RUN_NUMBER}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" MyShot.apk --clobber
+          else
+            gh release create "$TAG" MyShot.apk --target "$GITHUB_SHA" --title "MyShot build ${GITHUB_RUN_NUMBER}" --notes "Built from commit ${GITHUB_SHA::7}." --latest
+          fi
 
       # Optional: signed release APK + AAB for Google Play. Runs only if the four signing secrets are set.
       - name: Signed release (APK + AAB)

@@ -13,6 +13,9 @@
 1. נכנסים ל-[Actions](https://github.com/Ranjacobi/MyShot/actions) ופותחים את ההרצה האחרונה של **Build Android APK**.
 2. תחת Artifacts מורידים את **MyShot-apk** ופותחים את ה-zip.
 
+כל בנייה מתפרסמת גם תחת [Releases](https://github.com/Ranjacobi/MyShot/releases). בטלפון, הקישור הזה מוריד תמיד את ה-APK החדש ביותר (צריך להיות מחוברים ל-GitHub, כי המאגר פרטי):
+https://github.com/Ranjacobi/MyShot/releases/latest/download/MyShot.apk
+
 אפשר להפעיל את הבנייה גם ידנית: Actions ← Build Android APK ← Run workflow.
 
 כדאי שהמאגר יהיה פרטי. מי שמחזיק את מפתח החתימה (`ci/debug-signing.p12`) יכול לחתום APK שיותקן כעדכון של MyShot.
@@ -121,9 +124,11 @@ npx cap sync android
 |---|---|---|
 | Claude (Anthropic) | console.anthropic.com | `claude-sonnet-5-5` / `claude-haiku-5-5` |
 | ChatGPT (OpenAI) | platform.openai.com/api-keys | `gpt-6-sol` / `gpt-6-luna` |
-| Gemini (Google) | aistudio.google.com/apikey | `gemini-3.8-flash` / `gemini-3.5-flash-lite` |
+| Gemini (Google) | aistudio.google.com/apikey | `gemini-3.5-flash-lite` / `gemini-3.5-flash-lite` |
 
 אפשר לקבוע מודל אחר לכל ספק באותו מסך, למשל כשיוצא מודל חדש. השימוש ב-API בתשלום, לפי התעריף של הספק.
+
+במפתח חינמי של Gemini המכסה במודלים הגדולים נמוכה מאוד, לדקה וליום, ולכן ברירת המחדל היא Flash-Lite. אם בוחרים מודל Gemini גדול יותר והוא מגיע למגבלה או לא עונה תוך 40 שניות, האפליקציה מנסה שוב פעם אחת עם Flash-Lite.
 
 המפתחות נשמרים רק בטלפון, אחד לכל ספק, ולא נכללים בגיבוי. תמונה נשלחת לספק שנבחר רק כשמבקשים לנתח אותה. בלי מפתח האפליקציה עובדת כרגיל, רק בלי ניתוח התמונות.
 

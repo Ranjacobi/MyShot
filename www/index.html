@@ -912,7 +912,7 @@ const BYOK_ON = Native.on || !(window.claude && typeof window.claude.use === 'fu
 const AI_PROVIDERS = {
   anthropic: { label: 'Claude', by: 'Anthropic', site: 'console.anthropic.com', ph: 'sk-ant-...', vision: 'claude-sonnet-5-5', quick: 'claude-haiku-5-5' },
   openai: { label: 'ChatGPT', by: 'OpenAI', site: 'platform.openai.com/api-keys', ph: 'sk-...', vision: 'gpt-6-sol', quick: 'gpt-6-luna' },
-  gemini: { label: 'Gemini', by: 'Google', site: 'aistudio.google.com/apikey', ph: 'AIza...', vision: 'gemini-3.8-flash', quick: 'gemini-3.5-flash-lite' },
+  gemini: { label: 'Gemini', by: 'Google', site: 'aistudio.google.com/apikey', ph: 'AIza...', vision: 'gemini-3.5-flash-lite', quick: 'gemini-3.5-flash-lite', lite: 'gemini-3.5-flash-lite' },
 };
 const AIKeys = {
   read() {
@@ -944,9 +944,9 @@ async function aiPost(url, headers, body) {
 function aiClient(provider, key, modelOverride) {
   const P = AI_PROVIDERS[provider] || AI_PROVIDERS.anthropic;
   const toB64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
-  const call = async (prompt, opts = {}) => {
-    const model = modelOverride || (opts.modelTier === 'quick' ? P.quick : P.vision), text = String(prompt), imgs = [];
-    for (const im of (opts.images || [])) imgs.push({ type: /^image\/(jpeg|png|webp|gif)$/.test(im.type || '') ? im.type : 'image/jpeg', data: await toB64(im) });
+  const AI_TIMEOUT = 40000;
+  const withTimeout = pr => new Promise((res, rej) => { const t = setTimeout(() => rej({ code: 'timeout', provider }), AI_TIMEOUT); pr.then(v => { clearTimeout(t); res(v); }, e => { clearTimeout(t); rej(e); }); });
+  const attempt = async (model, text, imgs, think) => {
     let url, headers, body;
     if (provider === 'openai') {
       url = 'https://api.openai.com/v1/chat/completions';
@@ -956,24 +956,42 @@ function aiClient(provider, key, modelOverride) {
       url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       headers = { 'content-type': 'application/json', 'x-goog-api-key': key };
       body = { contents: [{ role: 'user', parts: [...imgs.map(i => ({ inline_data: { mime_type: i.type, data: i.data } })), { text }] }] };
+      if (think) body.generationConfig = { thinkingConfig: { thinkingLevel: 'low' } };
     } else {
       url = 'https://api.anthropic.com/v1/messages';
       headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
       body = { model, max_tokens: 4000, messages: [{ role: 'user', content: [...imgs.map(i => ({ type: 'image', source: { type: 'base64', media_type: i.type, data: i.data } })), { type: 'text', text }] }] };
     }
-    const r = await aiPost(url, headers, body), d = r.data || {}, st = r.status;
-    const msg = String((d.error && (d.error.message || d.error.status || d.error.type)) || (Array.isArray(d) && d[0] && d[0].error && d[0].error.message) || '');
-    const code = String((d.error && (d.error.code || d.error.type)) || '');
+    const r = await withTimeout(aiPost(url, headers, body)), d = (r && r.data) || {}, st = r ? r.status : 0;
     if (st >= 200 && st < 300) {
       if (provider === 'openai') return String((((d.choices || [])[0] || {}).message || {}).content || '');
       if (provider === 'gemini') return ((((d.candidates || [])[0] || {}).content || {}).parts || []).filter(x => !x.thought).map(x => x.text || '').join('');
       return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
     }
-    if (/quota|credit balance|billing|insufficient/i.test(msg + ' ' + code)) throw { code: 'quota' };
-    if (st === 401 || st === 403 || (st === 400 && /api[ _-]?key/i.test(msg))) throw { code: 'bad_key' };
-    if (st === 404 || (st === 400 && /model/i.test(msg))) throw { code: 'bad_model' };
-    if (st === 429 || st === 503 || st === 529) throw { code: 'rate_limited' };
-    throw { code: 'upstream_error' };
+    const raw = d.error || (Array.isArray(d) && d[0] && d[0].error) || {};
+    const msg = String(raw.message || raw.status || raw.type || ''), ecode = String(raw.code || raw.type || raw.status || '');
+    let retry = null; for (const x of (raw.details || [])) if (x && x.retryDelay) retry = parseInt(x.retryDelay, 10) || null;
+    const fail = c => ({ code: c, provider, model, status: st, detail: msg.slice(0, 160), retry });
+    if (think && st === 400 && /thinking/i.test(msg)) return attempt(model, text, imgs, false);
+    if (/limit:\s*0\b/.test(msg)) throw fail('not_in_tier');
+    if (st === 401 || st === 403 || (st === 400 && /api[ _-]?key/i.test(msg))) throw fail('bad_key');
+    if (st === 429 && provider === 'gemini') throw fail('rate_limited');
+    if (/credit balance|billing|insufficient/i.test(msg + ' ' + ecode)) throw fail('quota');
+    if (st === 429) throw fail(/quota/i.test(msg) ? 'quota' : 'rate_limited');
+    if (st === 500 || st === 502 || st === 503 || st === 529) throw fail('busy');
+    if (st === 404 || (st === 400 && /model/i.test(msg))) throw fail('bad_model');
+    throw fail('upstream_error');
+  };
+  const call = async (prompt, opts = {}) => {
+    const first = modelOverride || (opts.modelTier === 'quick' ? P.quick : P.vision), text = String(prompt), imgs = [];
+    for (const im of (opts.images || [])) imgs.push({ type: /^image\/(jpeg|png|webp|gif)$/.test(im.type || '') ? im.type : 'image/jpeg', data: await toB64(im) });
+    const think = provider === 'gemini' && /^gemini-3/.test(first) && !/lite/.test(first);
+    try { return await attempt(first, text, imgs, think); }
+    catch (e) {
+      // A heavier Gemini model hit its (often tiny) free-tier limit or timed out: try Flash-Lite once.
+      if (provider === 'gemini' && P.lite && first !== P.lite && ['rate_limited', 'not_in_tier', 'busy', 'timeout'].includes(e.code)) return attempt(P.lite, text, imgs, false);
+      throw e;
+    }
   };
   const parse = txt => {
     const t = String(txt).trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
@@ -1028,7 +1046,7 @@ async function aiTest() {
   if (!key) { toast('הדביקו מפתח קודם.', 'alert'); return; }
   const btn = $('[data-act="ai-test"]', sh); if (btn) { btn.disabled = true; btn.textContent = 'בודק…'; }
   try { const r = await aiClient(id, key, model).json('Reply with this JSON object only: {"ok": true}', { modelTier: 'quick' }); toast(r && r.ok ? `החיבור ל-${P.label} עובד ✓` : `${P.label} ענה, אבל בתשובה לא צפויה.`); }
-  catch (e) { toast(sampleErr(e), 'alert'); }
+  catch (e) { toast(sampleErr(e) + (e && e.detail ? ` (${e.detail.slice(0, 90)})` : ''), 'alert'); }
   if (btn) { btn.disabled = false; btn.textContent = 'בדיקת החיבור'; }
 }
 function nativeBars() {
@@ -2798,6 +2816,11 @@ function sampleErr(e) {
   if (c === 'quota') return 'נגמרה היתרה או המכסה בחשבון ה-API. בדקו את החשבון אצל הספק.';
   if (c === 'bad_model') return 'המודל שנבחר לא זמין. בדקו את שם המודל בהגדרות, או השאירו את השדה ריק.';
   if (c === 'network') return 'אין חיבור לאינטרנט. נסו שוב.';
+  if (c === 'not_in_tier') return 'המודל שנבחר לא כלול במכסה החינמית של המפתח. השאירו את שדה המודל ריק, או הפעילו חיוב אצל הספק.';
+  if (c === 'busy') return 'השירות של הספק עמוס כרגע. נסו שוב בעוד דקה.';
+  if (c === 'timeout') return 'הספק לא ענה בזמן. נסו שוב בעוד רגע.';
+  if (c === 'rate_limited' && e.provider === 'gemini') return `Gemini הגביל את מספר הבקשות. במפתח חינמי יש מכסה נמוכה לדקה וליום. נסו שוב ${e.retry ? `בעוד ${e.retry} שניות` : 'בעוד דקה'}, או הפעילו חיוב ב-AI Studio.`;
+  if (c === 'rate_limited' && e.provider) return `יותר מדי בקשות לספק כרגע. נסו שוב ${e.retry ? `בעוד ${e.retry} שניות` : 'בעוד דקה'}.`;
   if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(c)) { App.sampleOff = true; return 'האפשרות הזו לא זמינה כאן.'; }
   if (c === 'images_unavailable') { App.sampleImg = false; return 'זיהוי מתמונה לא זמין כאן. אפשר למלא ידנית.'; }
   if (c === 'rate_limited') return 'יותר מדי בקשות כרגע. נסו שוב מאוחר יותר.';

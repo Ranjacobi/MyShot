@@ -28,6 +28,8 @@ Every push to `main` builds a debug APK with GitHub Actions:
 2. Under **Artifacts**, download **MyShot-apk** and unzip it.
 3. Copy `MyShot.apk` to the phone, open it and allow installs from that source.
 
+Each build is also published under [Releases](https://github.com/Ranjacobi/MyShot/releases). On the phone, this link always downloads the newest APK (sign in to GitHub first, since the repository is private): https://github.com/Ranjacobi/MyShot/releases/latest/download/MyShot.apk
+
 To build without pushing: **Actions → Build Android APK → Run workflow**.
 
 All cloud builds are signed with the same debug key (`ci/debug-signing.p12`), so a new APK installs over the previous one and keeps the data. Keep this repository **private**: anyone with that key can sign an APK that installs as an update of MyShot.
@@ -69,9 +71,11 @@ Receipt auto-fill, meal photo and label analysis, and meal ideas work with your 
 |---|---|---|
 | Claude (Anthropic) | console.anthropic.com | `claude-sonnet-5-5` / `claude-haiku-5-5` |
 | ChatGPT (OpenAI) | platform.openai.com/api-keys | `gpt-6-sol` / `gpt-6-luna` |
-| Gemini (Google) | aistudio.google.com/apikey | `gemini-3.8-flash` / `gemini-3.5-flash-lite` |
+| Gemini (Google) | aistudio.google.com/apikey | `gemini-3.5-flash-lite` / `gemini-3.5-flash-lite` |
 
 You can set a different model for each provider on the same screen, for example when a newer one comes out. API usage is billed by the provider.
+
+Gemini's free tier allows only a few requests per minute and per day on its larger models, so the app uses Flash-Lite by default. If you choose a larger Gemini model and it hits a limit or doesn't answer within 40 seconds, the app retries once with Flash-Lite.
 
 Keys are stored only on the phone, one per provider, and aren't included in backups. A photo is sent to the selected provider only when you ask to analyze it. On Android, requests go through Capacitor's native HTTP, so they don't depend on browser CORS rules. Without a key, everything else works as usual.
 
