@@ -6,7 +6,8 @@
   "scripts": {
     "android:init": "npx cap add android && node scripts/patch-android.mjs && npx capacitor-assets generate --android && npx cap sync android",
     "android:sync": "npx cap sync android",
-    "android:open": "npx cap open android"
+    "android:open": "npx cap open android",
+    "build:apk": "bash build-apk.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

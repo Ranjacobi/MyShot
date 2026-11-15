@@ -1,79 +1,113 @@
-# MyShot לאנדרואיד
+# MyShot
 
-זו האפליקציה המלאה, כולל מסך הבית, התרופות, התזונה, התוספים, הקבלות, תמונות ההתקדמות ודוח הרופא. היא עטופה ב-Capacitor 8 כאפליקציית אנדרואיד, ונוספו לה תזכורות אמיתיות של הטלפון.
+[![Build Android APK](https://github.com/Ranjacobi/MyShot/actions/workflows/build-apk.yml/badge.svg)](https://github.com/Ranjacobi/MyShot/actions/workflows/build-apk.yml)
 
-## מה יש בפרויקט
+Personal tracker for weight-loss medications: doses, reminders, nutrition, supplements and doctor reports. A Hebrew (RTL) Android app built with [Capacitor 8](https://capacitorjs.com).
 
-| קובץ או תיקייה | מה זה |
-|---|---|
-| `www/index.html` | האפליקציה עצמה. כאן עורכים כשרוצים לשנות משהו |
-| `capacitor.config.json` | שם האפליקציה, מזהה החבילה והגדרות התוספים |
-| `assets/` | אייקון ומסכי פתיחה, שמהם נוצרים כל הגדלים לאנדרואיד |
-| `resources/android/` | אייקון ההתראות לשורת הסטטוס |
-| `scripts/patch-android.mjs` | מוסיף את הרשאות ההתראות ובודק את גרסת ה-SDK |
-| `store/` | אייקון 512 ותמונת הנושא (1024×500) לדף בחנות |
+> MyShot is a personal journal, not a medical device. Dosing decisions belong to your doctor.
 
-## בנייה בפעם הראשונה
+[מדריך בעברית](README.he.md)
 
-צריך Node.js בגרסת LTS עדכנית ו-Android Studio עדכני. הפקודות רצות מתוך התיקייה של הפרויקט:
+## Features
+
+- **Your medication.** Weekly injections (Mounjaro, Zepbound, Wegovy, Ozempic), a daily injection (Saxenda), pills (Wegovy pill, Ozempic pill, Rybelsus, Foundayo, Contrave/Mysimba, Xenical/orlistat), or a custom medication. Each comes with its own dose steps, missed-dose rule, minimum gap between doses, storage notes and pen or pack type, taken from the official prescribing information.
+- **Reminders.** Notifications for the dose, a follow-up if it wasn't logged, the evening before, supplements, water, a weekly weigh-in, and low stock or an expiring pen. Buttons on the notification log the dose or snooze it for an hour.
+- **Injections.** Site rotation on a body map, the dose ladder, the dose plan from your doctor, and an estimated medication-level chart for weekly injections.
+- **Nutrition.** Log meals from a photo, a nutrition label, free text or by hand. Save recipes, and track daily protein, fiber, calories and water.
+- **Supplements.** What to take and when, by day of the week, with stock tracking. Protein shakes count toward daily protein.
+- **Tracking.** Side effects by day of the injection cycle, weight and BMI, progress photos with side-by-side comparison, and 7- and 30-day summaries.
+- **Receipts.** Photograph a receipt and, with an AI key, the date, amount, vendor and category fill in automatically.
+- **For the doctor.** A PDF report, a text summary and a list of questions for the next visit.
+- **Private.** All data stays on the phone. Backups and reports leave only through the Android share sheet.
+
+## Get the APK
+
+Every push to `main` builds a debug APK with GitHub Actions:
+
+1. Open [Actions](https://github.com/Ranjacobi/MyShot/actions) and the latest **Build Android APK** run.
+2. Under **Artifacts**, download **MyShot-apk** and unzip it.
+3. Copy `MyShot.apk` to the phone, open it and allow installs from that source.
+
+To build without pushing: **Actions → Build Android APK → Run workflow**.
+
+All cloud builds are signed with the same debug key (`ci/debug-signing.p12`), so a new APK installs over the previous one and keeps the data. Keep this repository **private**: anyone with that key can sign an APK that installs as an update of MyShot.
+
+## Build locally
+
+Requires Node.js 22+ and Android Studio, which bundles JDK 21.
+
+```bash
+./build-apk.sh    # macOS or Linux
+build-apk.cmd     # Windows
+```
+
+The script installs dependencies, creates the Android project on the first run and writes `MyShot.apk` to the project folder. Local builds are signed with your own debug key, so don't mix local and cloud builds on the same phone.
+
+To work in Android Studio instead:
 
 ```bash
 npm install
-npx cap add android
-node scripts/patch-android.mjs
-npx capacitor-assets generate --android
-npx cap sync android
+npm run android:init    # first time only
 npx cap open android
 ```
 
-אפשר להריץ את ארבע הפקודות האמצעיות גם בפקודה אחת: `npm run android:init`.
+After editing `www/index.html`, run `npx cap sync android`.
 
-ב-Android Studio מחברים טלפון בכבל, עם ניפוי באגים ב-USB מופעל, ולוחצים Run.
+## Reminders
 
-## אחרי שינוי באפליקציה
+Reminders are scheduled on the phone, so they arrive when the app is closed and offline. They're rescheduled after every change, so a follow-up never fires once the dose is logged. Turn each type on or off in **Settings → תזכורות**.
 
-עורכים את `www/index.html`, ואז:
+- The app asks for notification permission on first launch (Android 13+).
+- On Android 14+, exact-time alarms need extra approval. Settings has a button for it; without it, Android may delay a reminder by a few minutes.
+- Some manufacturers stop notifications from apps they consider idle. If reminders don't arrive, exclude MyShot from battery optimization.
 
-```bash
-npx cap sync android
-```
+## AI features (optional)
 
-## העלאה ל-Google Play
+Receipt auto-fill, meal photo and label analysis, and meal ideas work with your own API key from one of three providers. Pick one in **Settings → בינה מלאכותית**, paste the key and tap **בדיקת החיבור** to check it.
 
-1. **גרסת SDK:** Google Play דורש מאפליקציות חדשות ומעדכונים לטרגט Android 16 (API 36). הסקריפט בודק את זה ומזהיר אם הגרסה נמוכה יותר.
-2. **מזהה החבילה:** הוא `com.itranstudios.myshot`. אם רוצים מזהה אחר, משנים אותו ב-`capacitor.config.json` לפני `npx cap add android`, כי אחרי ההעלאה הראשונה לחנות אי אפשר לשנות אותו.
-3. **בנייה חתומה:** ב-Android Studio בוחרים Build ← Generate Signed App Bundle, ומעלים את קובץ ה-AAB. את קובץ המפתח (keystore) שומרים בגיבוי — בלעדיו אי אפשר לעדכן את האפליקציה.
-4. **טופס Data safety:** כל הנתונים נשמרים בטלפון בלבד. אם משתמשים במפתח Claude (בהמשך), תמונות ותיאורי ארוחות שהמשתמש בוחר לנתח נשלחים ל-Anthropic.
-5. **מדיניות בריאות:** כדאי לעבור על מדיניות Google Play לאפליקציות בריאות. האפליקציה היא יומן אישי ומציגה הסתייגות רפואית, אבל הטפסים בקונסולה שואלים על זה.
+| Provider | Get a key | Default models (photos / meal ideas) |
+|---|---|---|
+| Claude (Anthropic) | console.anthropic.com | `claude-sonnet-5-5` / `claude-haiku-5-5` |
+| ChatGPT (OpenAI) | platform.openai.com/api-keys | `gpt-6-sol` / `gpt-6-luna` |
+| Gemini (Google) | aistudio.google.com/apikey | `gemini-3.8-flash` / `gemini-3.5-flash-lite` |
 
-## תזכורות
+You can set a different model for each provider on the same screen, for example when a newer one comes out. API usage is billed by the provider.
 
-הן מתוזמנות בטלפון עצמו, ומגיעות גם כשהאפליקציה סגורה ובלי אינטרנט. אחרי כל תיעוד הן מתעדכנות, כך שאם כבר סימנתם — תזכורת המעקב לא תגיע.
+Keys are stored only on the phone, one per provider, and aren't included in backups. A photo is sent to the selected provider only when you ask to analyze it. On Android, requests go through Capacitor's native HTTP, so they don't depend on browser CORS rules. Without a key, everything else works as usual.
 
-- **מנה או הזרקה:** בזריקה שבועית ביום ובשעה הקבועים. בכדור יומי כל יום בשעה שנבחרה. בקסניקל עם כל ארוחה.
-- **אם לא תועד:** כמה שעות אחרי המועד, ובכדורים על קיבה ריקה כבר אחרי שעה. אם יש איחור בזריקה שבועית, מגיעה תזכורת יומית עד שעובר הזמן שבו עוד אפשר להזריק.
-- **ערב לפני** (שבועי), **תוספים** לפי שעות הבוקר, הצהריים, הערב והלילה, **מים**, **שקילה שבועית** ו**מלאי** (מלאי נמוך, ועט שעומד לפוג).
-- **כפתורים בהתראה:** ״תיעדתי״ רושם את המנה מיד, ובזריקה עם האזור המומלץ. ״בעוד שעה״ דוחה את התזכורת. בתוספים יש ״לקחתי הכול״.
+Personal keys suit personal use. For a public release, keep the keys on a small server and point `aiClient` in `www/index.html` at it.
 
-הכול מופעל ומכובה בהגדרות, תחת ״תזכורות״.
+## Google Play release
 
-**הרשאות:** בהפעלה הראשונה האפליקציה מבקשת הרשאה להתראות. באנדרואיד 14 ומעלה, תזכורת בשעה המדויקת דורשת אישור נוסף — יש לו כפתור בהגדרות. בלי האישור, אנדרואיד עלול לעכב תזכורת בכמה דקות.
+Google Play needs an AAB signed with your own upload key, and new apps must target Android 16 (API 36). Capacitor 8 targets 36, and `scripts/patch-android.mjs` checks it.
 
-**חיסכון בסוללה:** חלק מהיצרנים (למשל שיאומי, ובחלק מהמכשירים גם סמסונג) עוצרים התראות של אפליקציות ״רדומות״. אם תזכורת לא מגיעה, כדאי להוציא את MyShot מרשימת החיסכון בסוללה.
+1. Create an upload key once, and back it up. Without it you can't update the app on Play.
+   ```bash
+   keytool -genkeypair -keystore myshot-release.jks -alias myshot -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Add four secrets under **Settings → Secrets and variables → Actions**:
+   - `ANDROID_KEYSTORE_BASE64`: the keystore in base64 (`base64 -i myshot-release.jks | pbcopy` on macOS)
+   - `ANDROID_KEYSTORE_PASSWORD`
+   - `ANDROID_KEY_ALIAS`: `myshot`
+   - `ANDROID_KEY_PASSWORD`
+3. From the next run, **Artifacts** also has **MyShot-release** with a signed APK and AAB.
 
-## Claude באפליקציה (לא חובה)
+Never commit the release keystore; `.gitignore` already excludes `*.jks`. The package ID is `com.itranstudios.myshot`. To change it, edit `capacitor.config.json` before the first Play upload, because it can't change afterwards.
 
-צילום קבלות, ניתוח ארוחה מתמונה, תווית מזון ורעיונות לארוחות עובדים דרך Claude. ב-claude.ai זה עבד דרך החשבון, ובאפליקציה עצמאית צריך מפתח API אישי:
+## Project structure
 
-1. יוצרים מפתח ב-console.anthropic.com. השימוש מחויב לפי הצריכה.
-2. באפליקציה: הגדרות ← Claude באפליקציה ← מדביקים את המפתח ושומרים.
+| Path | What it is |
+|---|---|
+| `www/index.html` | The whole app: HTML, CSS and JavaScript in one file |
+| `capacitor.config.json` | App name, package ID and plugin settings |
+| `.github/workflows/build-apk.yml` | Cloud build |
+| `build-apk.sh`, `build-apk.cmd` | One-command local build |
+| `scripts/patch-android.mjs` | Adds notification permissions and the status-bar icon, and checks the target SDK |
+| `assets/` | Sources for the launcher icon and splash screens |
+| `resources/android/` | Notification icon |
+| `store/` | Play Store icon (512 px) and feature graphic (1024×500) |
+| `ci/debug-signing.p12` | Fixed debug key for cloud builds |
 
-המפתח נשמר רק בטלפון ולא נכלל בגיבוי. ניתוח תמונות משתמש ב-`claude-sonnet-5-5`, ורעיונות לארוחות ב-`claude-haiku-5-5`.
+## Medical information
 
-**לפרסום ציבורי** זה לא הפתרון הנכון: לא כדאי לבקש מכל משתמש מפתח משלו, ואסור לשים מפתח שלכם בתוך האפליקציה. במקרה כזה צריך שרת קטן שמחזיק את המפתח ומעביר את הבקשות. זה שינוי של פונקציה אחת (`NativeAI.client` ב-`www/index.html`).
-
-בלי מפתח האפליקציה עובדת כרגיל, רק בלי ניתוח התמונות.
-
-## נתונים וגיבוי
-
-הנתונים נשמרים בטלפון בלבד. הסרת האפליקציה או ״ניקוי נתונים״ בהגדרות אנדרואיד מוחקים אותם. ״ייצוא גיבוי״ ודוח ה-PDF נפתחים בחלון השיתוף של אנדרואיד, ומשם אפשר לשמור לקבצים, ל-Google Drive או לשלוח. ״ייבוא גיבוי״ משחזר — גם מגיבוי של הגרסה ב-claude.ai.
+Medication rules such as dose steps, missed doses and storage come from the official prescribing information and are shown for reference. The level chart is an estimate based on published pharmacokinetics, not a blood test. Always follow your doctor and the leaflet that came with your medication.

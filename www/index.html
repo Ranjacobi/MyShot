@@ -278,7 +278,7 @@ button.row:hover{background:var(--surface-2);}
 .sheet-foot .btn{flex:1;}
 .field{display:block;margin:16px 0 0;}
 .field>.fl{display:block;font-size:14px;color:var(--ink-2);margin-bottom:7px;font-weight:500;}
-input[type=text],input[type=number],input[type=date],input[type=datetime-local],input[type=time],textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:12px;padding:11px 12px;min-height:48px;}
+input[type=text],input[type=password],input[type=number],input[type=date],input[type=datetime-local],input[type=time],textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:12px;padding:11px 12px;min-height:48px;}
 input[type=date],input[type=datetime-local],input[type=time]{direction:ltr;text-align:right;}
 input[type=number]{direction:ltr;text-align:right;}
 textarea{min-height:76px;resize:vertical;line-height:1.5;}
@@ -908,44 +908,86 @@ const NativeFiles = {
     return { saved: true };
   },
 };
-const NativeAI = {
-  key() { try { return localStorage.getItem('mj-akey') || ''; } catch (e) { return ''; } },
-  setKey(k) { try { if (k) localStorage.setItem('mj-akey', k); else localStorage.removeItem('mj-akey'); } catch (e) {} },
-  setup() {
-    if (!Native.on) return;
-    const key = this.key();
-    if (!key) { App.sample = null; App.sampleImg = false; return; }
-    App.sampleOff = false; App.sample = this.client(key); App.sampleImg = true;
+const BYOK_ON = Native.on || !(window.claude && typeof window.claude.use === 'function');
+const AI_PROVIDERS = {
+  anthropic: { label: 'Claude', by: 'Anthropic', site: 'console.anthropic.com', ph: 'sk-ant-...', vision: 'claude-sonnet-5-5', quick: 'claude-haiku-5-5' },
+  openai: { label: 'ChatGPT', by: 'OpenAI', site: 'platform.openai.com/api-keys', ph: 'sk-...', vision: 'gpt-6-sol', quick: 'gpt-6-luna' },
+  gemini: { label: 'Gemini', by: 'Google', site: 'aistudio.google.com/apikey', ph: 'AIza...', vision: 'gemini-3.8-flash', quick: 'gemini-3.5-flash-lite' },
+};
+const AIKeys = {
+  read() {
+    let c = {}; try { c = JSON.parse(localStorage.getItem('mj-ai') || '{}') || {}; } catch (e) {}
+    c.keys = c.keys || {}; c.models = c.models || {};
+    try { const old = localStorage.getItem('mj-akey'); if (old && !c.keys.anthropic) { c.keys.anthropic = old; c.provider = c.provider || 'anthropic'; } } catch (e) {}
+    if (!AI_PROVIDERS[c.provider]) c.provider = 'anthropic';
+    return c;
   },
-  client(key) {
-    const toB64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
-    const call = async (prompt, opts = {}) => {
-      const content = [];
-      for (const im of (opts.images || [])) content.push({ type: 'image', source: { type: 'base64', media_type: /^image\/(jpeg|png|webp|gif)$/.test(im.type || '') ? im.type : 'image/jpeg', data: await toB64(im) } });
-      content.push({ type: 'text', text: String(prompt) });
-      let r;
-      try {
-        r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: opts.modelTier === 'quick' ? 'claude-haiku-5-5' : 'claude-sonnet-5-5', max_tokens: 4000, messages: [{ role: 'user', content }] }) });
-      } catch (e) { throw { code: 'network' }; }
-      if (r.status === 401 || r.status === 403) throw { code: 'bad_key' };
-      if (r.status === 429 || r.status === 529) throw { code: 'rate_limited' };
-      if (!r.ok) throw { code: 'upstream_error' };
-      const j = await r.json();
-      return (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
-    };
-    const parse = txt => {
-      const t = String(txt).trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
-      try { return JSON.parse(t); } catch (e) {}
-      const a = t.search(/[\[{]/), b = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
-      if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
-      throw new Error('json');
-    };
-    const fn = async (prompt, opts) => ({ text: await call(prompt, opts) });
-    fn.json = async (prompt, opts) => { const txt = await call(prompt + '\n\nReply with valid JSON only: no prose and no code fences.', opts); try { return parse(txt); } catch (e) { throw { code: 'invalid_json' }; } };
-    fn.limits = async () => ({ images: { maxCount: 4 } });
-    return fn;
+  write(c) { try { localStorage.setItem('mj-ai', JSON.stringify({ provider: c.provider, keys: c.keys, models: c.models })); localStorage.removeItem('mj-akey'); } catch (e) {} },
+  setup() {
+    if (!BYOK_ON) return;
+    const c = AIKeys.read(), key = c.keys[c.provider];
+    if (!key) { App.sample = null; App.sampleImg = false; return; }
+    App.sampleOff = false; App.sample = aiClient(c.provider, key, c.models[c.provider] || ''); App.sampleImg = true;
   },
 };
+async function aiPost(url, headers, body) {
+  const H = Native.plugin('CapacitorHttp');
+  if (H && typeof H.request === 'function') {
+    let r; try { r = await H.request({ url, method: 'POST', headers, data: body, responseType: 'json' }); } catch (e) { throw { code: 'network' }; }
+    let data = r && r.data; if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) {} }
+    return { status: r ? r.status : 0, data };
+  }
+  let r; try { r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }); } catch (e) { throw { code: 'network' }; }
+  let data = null; try { data = await r.json(); } catch (e) {}
+  return { status: r.status, data };
+}
+function aiClient(provider, key, modelOverride) {
+  const P = AI_PROVIDERS[provider] || AI_PROVIDERS.anthropic;
+  const toB64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
+  const call = async (prompt, opts = {}) => {
+    const model = modelOverride || (opts.modelTier === 'quick' ? P.quick : P.vision), text = String(prompt), imgs = [];
+    for (const im of (opts.images || [])) imgs.push({ type: /^image\/(jpeg|png|webp|gif)$/.test(im.type || '') ? im.type : 'image/jpeg', data: await toB64(im) });
+    let url, headers, body;
+    if (provider === 'openai') {
+      url = 'https://api.openai.com/v1/chat/completions';
+      headers = { 'content-type': 'application/json', authorization: 'Bearer ' + key };
+      body = { model, messages: [{ role: 'user', content: [{ type: 'text', text }, ...imgs.map(i => ({ type: 'image_url', image_url: { url: `data:${i.type};base64,${i.data}` } }))] }] };
+    } else if (provider === 'gemini') {
+      url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+      headers = { 'content-type': 'application/json', 'x-goog-api-key': key };
+      body = { contents: [{ role: 'user', parts: [...imgs.map(i => ({ inline_data: { mime_type: i.type, data: i.data } })), { text }] }] };
+    } else {
+      url = 'https://api.anthropic.com/v1/messages';
+      headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+      body = { model, max_tokens: 4000, messages: [{ role: 'user', content: [...imgs.map(i => ({ type: 'image', source: { type: 'base64', media_type: i.type, data: i.data } })), { type: 'text', text }] }] };
+    }
+    const r = await aiPost(url, headers, body), d = r.data || {}, st = r.status;
+    const msg = String((d.error && (d.error.message || d.error.status || d.error.type)) || (Array.isArray(d) && d[0] && d[0].error && d[0].error.message) || '');
+    const code = String((d.error && (d.error.code || d.error.type)) || '');
+    if (st >= 200 && st < 300) {
+      if (provider === 'openai') return String((((d.choices || [])[0] || {}).message || {}).content || '');
+      if (provider === 'gemini') return ((((d.candidates || [])[0] || {}).content || {}).parts || []).filter(x => !x.thought).map(x => x.text || '').join('');
+      return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+    }
+    if (/quota|credit balance|billing|insufficient/i.test(msg + ' ' + code)) throw { code: 'quota' };
+    if (st === 401 || st === 403 || (st === 400 && /api[ _-]?key/i.test(msg))) throw { code: 'bad_key' };
+    if (st === 404 || (st === 400 && /model/i.test(msg))) throw { code: 'bad_model' };
+    if (st === 429 || st === 503 || st === 529) throw { code: 'rate_limited' };
+    throw { code: 'upstream_error' };
+  };
+  const parse = txt => {
+    const t = String(txt).trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+    try { return JSON.parse(t); } catch (e) {}
+    const a = t.search(/[\[{]/), b = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
+    if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
+    throw new Error('json');
+  };
+  const fn = async (prompt, opts) => ({ text: await call(prompt, opts) });
+  fn.json = async (prompt, opts) => { const txt = await call(prompt + '\n\nReply with valid JSON only: no prose and no code fences.', opts); try { return parse(txt); } catch (e) { throw { code: 'invalid_json' }; } };
+  fn.limits = async () => ({ images: { maxCount: 4 } });
+  fn.provider = provider;
+  return fn;
+}
 function remToF() { const r = remCfg(); return { rem_dose: r.dose, rem_follow: r.follow, rem_eve: r.eve, rem_supps: r.supps, rem_water: r.water, rem_weigh: r.weigh, rem_stock: r.stock, rem_weighDay: r.weighDay, num: ['dose', 'rem_weighDay'] }; }
 function remSettingsHTML() {
   const r = remCfg(), m = curMed(), t = T();
@@ -966,11 +1008,28 @@ function readRemForm(sh, f) {
   return { dose: !!f.rem_dose, follow: !!f.rem_follow, eve: !!f.rem_eve, supps: !!f.rem_supps, water: !!f.rem_water, weigh: !!f.rem_weigh, stock: !!f.rem_stock, weighDay: Number.isInteger(f.rem_weighDay) ? f.rem_weighDay : r.weighDay, time2: tm('f-rt-time2') || r.time2, slots };
 }
 function aiSettingsHTML() {
-  const has = !!NativeAI.key();
-  return `<h3 class="h-sub" style="margin-top:26px">Claude באפליקציה</h3>
-  <p class="small muted">צילום קבלות, ניתוח ארוחות מתמונה ורעיונות לארוחות עובדים דרך Claude. באפליקציה צריך לשם כך מפתח API אישי מ-console.anthropic.com, והשימוש מחויב לפי הצריכה. המפתח נשמר רק בטלפון הזה ולא נכלל בגיבוי. תמונה נשלחת ל-Anthropic רק כשמבקשים לנתח אותה.</p>
-  <label class="field"><span class="fl">מפתח API${has ? ' (שמור)' : ''}</span><input type="password" id="f-akey" autocomplete="off" spellcheck="false" dir="ltr" placeholder="${has ? 'השאירו ריק כדי לא לשנות' : 'sk-ant-...'}"></label>
-  ${has ? '<button class="chip out" data-act="akey-del" style="color:var(--alert)">הסרת המפתח</button>' : ''}`;
+  if (!F.aiProv) F.aiProv = AIKeys.read().provider;
+  return `<h3 class="h-sub" style="margin-top:26px">בינה מלאכותית</h3>
+  <p class="small muted">צילום קבלות, ניתוח ארוחות מתמונה ורעיונות לארוחות עובדים עם מפתח API אישי. בוחרים ספק ומדביקים מפתח. המפתח נשמר רק בטלפון ולא נכלל בגיבוי, ותמונה נשלחת לספק רק כשמבקשים לנתח אותה. השימוש ב-API בתשלום, לפי התעריף של הספק.</p>
+  <div class="chips" role="group" aria-label="ספק" style="margin-top:12px">${Object.entries(AI_PROVIDERS).map(([id, p]) => `<button class="chip" data-pick="aiProv" data-val="${id}" aria-pressed="${F.aiProv === id}">${p.label}</button>`).join('')}</div>
+  <div id="f-aiblock">${aiBlockHTML()}</div>`;
+}
+function aiBlockHTML() {
+  const c = AIKeys.read(), id = F.aiProv, P = AI_PROVIDERS[id], has = !!c.keys[id];
+  return `<label class="field"><span class="fl">מפתח API של ${P.label}${has ? ' (שמור)' : ''}</span><input type="password" id="f-akey" autocomplete="off" spellcheck="false" dir="ltr" placeholder="${has ? 'השאירו ריק כדי לא לשנות' : P.ph}"></label>
+  <p class="tiny muted" style="margin:6px 0 14px">את המפתח יוצרים באתר: <bdi>${P.site}</bdi></p>
+  <label class="field"><span class="fl">מודל (לא חובה)</span><input type="text" id="f-amodel" autocomplete="off" spellcheck="false" dir="ltr" value="${esc(c.models[id] || '')}" placeholder="${P.vision}"></label>
+  <p class="tiny muted" style="margin:6px 0 14px">אם משאירים ריק, לתמונות: <bdi>${P.vision}</bdi>. לרעיונות לארוחות: <bdi>${P.quick}</bdi>.</p>
+  <div class="chips"><button class="chip" data-act="ai-test">בדיקת החיבור</button>${has ? '<button class="chip out" data-act="akey-del" style="color:var(--alert)">הסרת המפתח</button>' : ''}</div>`;
+}
+async function aiTest() {
+  const sh = $('#sheet'), id = F.aiProv, P = AI_PROVIDERS[id], c = AIKeys.read();
+  const key = ((($('#f-akey', sh) || {}).value) || '').trim() || c.keys[id], model = ((($('#f-amodel', sh) || {}).value) || '').trim();
+  if (!key) { toast('הדביקו מפתח קודם.', 'alert'); return; }
+  const btn = $('[data-act="ai-test"]', sh); if (btn) { btn.disabled = true; btn.textContent = 'בודק…'; }
+  try { const r = await aiClient(id, key, model).json('Reply with this JSON object only: {"ok": true}', { modelTier: 'quick' }); toast(r && r.ok ? `החיבור ל-${P.label} עובד ✓` : `${P.label} ענה, אבל בתשובה לא צפויה.`); }
+  catch (e) { toast(sampleErr(e), 'alert'); }
+  if (btn) { btn.disabled = false; btn.textContent = 'בדיקת החיבור'; }
 }
 function nativeBars() {
   const SB = Native.plugin('SystemBars'); if (!SB || !SB.setStyle) return;
@@ -982,7 +1041,6 @@ async function nativeBoot() {
   if (!Native.on) return;
   document.documentElement.classList.add('native');
   App.downloads = NativeFiles;
-  NativeAI.setup();
   const AP = Native.plugin('App');
   if (AP) {
     try {
@@ -2737,6 +2795,8 @@ async function handleReceiptFile(file) {
 function sampleErr(e) {
   const c = e && e.code;
   if (c === 'bad_key') return 'מפתח ה-API לא תקין. בדקו אותו בהגדרות.';
+  if (c === 'quota') return 'נגמרה היתרה או המכסה בחשבון ה-API. בדקו את החשבון אצל הספק.';
+  if (c === 'bad_model') return 'המודל שנבחר לא זמין. בדקו את שם המודל בהגדרות, או השאירו את השדה ריק.';
   if (c === 'network') return 'אין חיבור לאינטרנט. נסו שוב.';
   if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(c)) { App.sampleOff = true; return 'האפשרות הזו לא זמינה כאן.'; }
   if (c === 'images_unavailable') { App.sampleImg = false; return 'זיהוי מתמונה לא זמין כאן. אפשר למלא ידנית.'; }
@@ -2870,12 +2930,13 @@ function openSettings() {
   const st = S.core.settings, c = st.customMed || {};
   F = { kind: 'set', med: st.med || 'mounjaro', day: hasDay() ? String(st.day) : 'none', time: st.time || '09:00', start: st.start || '', dose: st.dose, per: st.perPen || curMed().perPack || 4, arms: !!st.arms, theme: getTheme(), cmName: c.name || '', cmForm: c.form || 'pen', cmFreq: c.freq || 'weekly', cmDoses: (c.doses || []).join(', '), cmUnit: c.unit || 'מ״ג', num: ['dose'] };
   if (Native.on) Object.assign(F, remToF());
+  if (BYOK_ON) F.aiProv = AIKeys.read().provider;
   const storage = Backend.mode === 'cloud' ? 'הנתונים נשמרים באזור פרטי בחשבון שלך. אם תשתפו את הקישור, כל מי שיפתח אותו יראה רק את הנתונים של עצמו.' : (Native.on ? 'הנתונים נשמרים בטלפון הזה בלבד. הסרת האפליקציה או מחיקת הנתונים שלה תמחק גם אותם, לכן כדאי לייצא גיבוי מדי פעם.' : Local.db ? 'הנתונים נשמרים בדפדפן הזה בלבד. מחיקת נתוני הדפדפן תמחק גם אותם.' : 'אין כאן אפשרות שמירה, והנתונים יימחקו בסגירת הדף.');
   const body = `
     <h3 class="h-sub" style="margin-top:4px">התרופה</h3>
     <div>${medChipsHTML(F.med)}</div>
     <div id="f-medblock">${medBlockHTML(false)}</div>
-    ${Native.on ? remSettingsHTML() + aiSettingsHTML() : ''}
+    ${Native.on ? remSettingsHTML() : ''}${BYOK_ON ? aiSettingsHTML() : ''}
     <h3 class="h-sub" style="margin-top:26px">יעדים</h3>
     <div class="two"><label class="field"><span class="fl">מים (כוסות ביום)</span><input type="number" inputmode="numeric" min="1" max="20" id="f-water" value="${esc(st.water || 8)}"></label><label class="field"><span class="fl">חלבון (גרם ביום)</span><input type="number" inputmode="numeric" min="0" max="300" id="f-protein" value="${st.protein ? esc(st.protein) : ''}" placeholder="לא נקבע"></label></div>
     <div class="two"><label class="field"><span class="fl">קלוריות ביום</span><input type="number" inputmode="numeric" min="0" max="6000" id="f-kcal" value="${st.kcal ? esc(st.kcal) : ''}" placeholder="לא נקבע"></label><label class="field"><span class="fl">סיבים (גרם ביום)</span><input type="number" inputmode="numeric" min="0" max="100" id="f-fiber" value="${st.fiber ? esc(st.fiber) : ''}" placeholder="לא נקבע"></label></div>
@@ -2886,7 +2947,7 @@ function openSettings() {
     <div class="chips" style="margin-top:12px">${App.downloads ? '<button class="chip" data-act="export">ייצוא גיבוי</button>' : ''}<label class="chip file-btn">ייבוא גיבוי<input type="file" accept="application/json,.json" data-file="import"></label><button class="chip out" style="color:var(--alert)" data-act="wipe">מחיקת כל הנתונים</button></div>
     <p class="disclaimer" style="margin-top:20px">המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי.</p>`;
   Sheet.open('הגדרות', body, '<button class="btn" data-act="set-save">שמירת ההגדרות</button>', sh => {
-    F.onChange = g => { if (g === 'theme') setTheme(F.theme); medFormChange(sh, g, false); };
+    F.onChange = g => { if (g === 'theme') setTheme(F.theme); if (g === 'aiProv') { const b = $('#f-aiblock', sh); if (b) b.innerHTML = aiBlockHTML(); } medFormChange(sh, g, false); };
   });
 }
 function settingsSave() {
@@ -2895,7 +2956,7 @@ function settingsSave() {
   const kcal = Math.round(numVal($('#f-kcal', sh))), fiber = Math.round(numVal($('#f-fiber', sh))), height = Math.round(numVal($('#f-height', sh)));
   const f = { ...F }; if (!validMedForm(f)) return;
   const m = formMed(), changed = f.med !== (S.core.settings.med || 'mounjaro');
-  const remNew = Native.on ? readRemForm(sh, f) : null, akey = Native.on && $('#f-akey', sh) ? $('#f-akey', sh).value.trim() : '';
+  const remNew = Native.on ? readRemForm(sh, f) : null, akey = $('#f-akey', sh) ? $('#f-akey', sh).value.trim() : '', amodel = $('#f-amodel', sh) ? $('#f-amodel', sh).value.trim().slice(0, 80) : null;
   if (!mutate('core', c => {
     const s = c.settings;
     s.med = f.med; if (f.med === 'custom') s.customMed = customMedFromF(f);
@@ -2913,8 +2974,13 @@ function settingsSave() {
     s.setup = true;
     if (remNew) s.rem = remNew;
   })) return;
-  if (akey) { NativeAI.setKey(akey); NativeAI.setup(); }
-  Sheet.close(); toast(changed ? `עברתם ל${m.name}` : 'ההגדרות נשמרו');
+  let aiNote = '';
+  if (BYOK_ON && f.aiProv && AI_PROVIDERS[f.aiProv]) {
+    const c = AIKeys.read(); c.provider = f.aiProv; if (akey) c.keys[f.aiProv] = akey; if (amodel !== null) c.models[f.aiProv] = amodel;
+    AIKeys.write(c); AIKeys.setup();
+    if (!c.keys[f.aiProv]) aiNote = ` בלי מפתח של ${AI_PROVIDERS[f.aiProv].label}, ניתוח התמונות כבוי.`;
+  }
+  Sheet.close(); toast((changed ? `עברתם ל${m.name}.` : 'ההגדרות נשמרו.') + aiNote);
 }
 
 function openOnboarding() {
@@ -3668,7 +3734,8 @@ document.addEventListener('click', e => {
     case 'quick': openQuick(); break;
     case 'rem-ask': Reminders.ask(); break;
     case 'rem-exact': Reminders.askExact(); break;
-    case 'akey-del': NativeAI.setKey(''); NativeAI.setup(); Sheet.close(); toast('המפתח הוסר'); App.render(); break;
+    case 'akey-del': { const c = AIKeys.read(); delete c.keys[F.aiProv]; AIKeys.write(c); AIKeys.setup(); const b = $('#f-aiblock'); if (b) b.innerHTML = aiBlockHTML(); toast('המפתח הוסר'); break; }
+    case 'ai-test': aiTest(); break;
     case 'cnt': { F.count = Math.max(1, Math.min(10, (+F.count || 1) + +d.n)); const el = $('#f-cnt'); if (el) el.textContent = F.count; break; }
     case 'go-supps': Sheet.close(); setTab('supps'); break;
     case 'seg': if (d.g === 'food' && (d.k === 'meals' || d.k === 'supps')) App.foodSeg = d.k; if (d.g === 'track' && ['summary', 'symptoms', 'body'].includes(d.k)) App.trackSeg = d.k; App.render(); window.scrollTo(0, 0); break;
@@ -3737,6 +3804,7 @@ async function boot() {
   window.addEventListener('pagehide', () => Sync.flushAll());
   setInterval(() => { if (App.ready && !Sheet.isOpen()) App.render(); }, 5 * 60 * 1000);
   initOptional();
+  AIKeys.setup();
   nativeBoot();
   await Backend.init();
   const done = () => {
