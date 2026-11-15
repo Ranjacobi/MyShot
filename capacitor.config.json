@@ -1,0 +1,13 @@
+{
+  "appId": "com.itranstudios.myshot",
+  "appName": "MyShot",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#F3F5F8"
+  },
+  "plugins": {
+    "SystemBars": { "insetsHandling": "css" },
+    "LocalNotifications": { "smallIcon": "ic_stat_myshot", "iconColor": "#18224F" },
+    "SplashScreen": { "launchShowDuration": 600, "launchAutoHide": true, "backgroundColor": "#F3F5F8", "showSpinner": false }
+  }
+}
