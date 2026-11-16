@@ -74,15 +74,13 @@ Manage them on the **עוד → תזכורות** screen: switch each type on or 
 
 Receipt auto-fill, meal photo and label analysis, and meal ideas work with your own API key from one of three providers. Pick one in **Settings → בינה מלאכותית**, paste the key and tap **בדיקת החיבור** to check it.
 
-| Provider | Get a key | Default models (photos / meal ideas) |
+| Provider | Get a key | Models offered (the cheapest that read images) |
 |---|---|---|
-| Claude (Anthropic) | console.anthropic.com | `claude-sonnet-5-5` / `claude-haiku-5-5` |
-| ChatGPT (OpenAI) | platform.openai.com/api-keys | `gpt-6-sol` / `gpt-6-luna` |
-| Gemini (Google) | aistudio.google.com/apikey | `gemini-3.5-flash-lite` / `gemini-3.5-flash-lite` |
+| Claude (Anthropic) | console.anthropic.com | Haiku family, now Claude Haiku 5.5 |
+| ChatGPT (OpenAI) | platform.openai.com/api-keys | Luna and Nano families, now GPT-6 Luna |
+| Gemini (Google) | aistudio.google.com/apikey | Flash-Lite family, now Gemini 3.5 Flash-Lite |
 
-You can set a different model for each provider on the same screen, for example when a newer one comes out. API usage is billed by the provider.
-
-Gemini's free tier allows only a few requests per minute and per day on its larger models, so the app uses Flash-Lite by default. If you choose a larger Gemini model and it hits a limit or doesn't answer within 40 seconds, the app retries once with Flash-Lite.
+The model is picked from a list, never typed. With your key, the app reads the provider's current model list, keeps only these cheapest image-capable families, newest first, and refreshes it every few days. **אוטומטי** always uses the newest one, so a new model shows up without an app update. If a chosen model is retired, or a Gemini model hits its free-tier limit, the app retries once with the next model in the list. API usage is billed by the provider.
 
 Keys are stored only on the phone, one per provider, and aren't included in backups. A photo is sent to the selected provider only when you ask to analyze it. On Android, requests go through Capacitor's native HTTP, so they don't depend on browser CORS rules. Without a key, everything else works as usual.
 

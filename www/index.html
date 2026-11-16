@@ -759,8 +759,9 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const CHANGELOG = [
+  ['1.4.2', 'בחירת מודל AI מרשימה שמתעדכנת לבד: רק המודלים הזולים שמזהים תמונות'],
   ['1.4.1', 'צילום ארוחה עם זיהוי חזר לעבוד דרך המצלמה של הטלפון, ואפשר לצלם מחדש במקום זיהוי קודם'],
   ['1.4.0', 'מעבר מהיר בין מצב כהה לבהיר, קרדיט ומספר גרסה'],
   ['1.3.0', 'מצלמה לארוחות, לתוויות ולקבלות, מסך תזכורות עם תזכורות משלכם, וגיבוי ל-Google Drive'],
@@ -1107,8 +1108,8 @@ const NativeFiles = {
 };
 const BYOK_ON = Native.on || !(window.claude && typeof window.claude.use === 'function');
 const AI_PROVIDERS = {
-  anthropic: { label: 'Claude', by: 'Anthropic', site: 'console.anthropic.com', ph: 'sk-ant-...', vision: 'claude-sonnet-5-5', quick: 'claude-haiku-5-5' },
-  openai: { label: 'ChatGPT', by: 'OpenAI', site: 'platform.openai.com/api-keys', ph: 'sk-...', vision: 'gpt-6-sol', quick: 'gpt-6-luna' },
+  anthropic: { label: 'Claude', by: 'Anthropic', site: 'console.anthropic.com', ph: 'sk-ant-...', vision: 'claude-haiku-5-5', quick: 'claude-haiku-5-5' },
+  openai: { label: 'ChatGPT', by: 'OpenAI', site: 'platform.openai.com/api-keys', ph: 'sk-...', vision: 'gpt-6-luna', quick: 'gpt-6-luna' },
   gemini: { label: 'Gemini', by: 'Google', site: 'aistudio.google.com/apikey', ph: 'AIza...', vision: 'gemini-3.5-flash-lite', quick: 'gemini-3.5-flash-lite', lite: 'gemini-3.5-flash-lite' },
 };
 const AIKeys = {
@@ -1125,8 +1126,63 @@ const AIKeys = {
     const c = AIKeys.read(), key = c.keys[c.provider];
     if (!key) { App.sample = null; App.sampleImg = false; return; }
     App.sampleOff = false; App.sample = aiClient(c.provider, key, c.models[c.provider] || ''); App.sampleImg = true;
+    if (AIModels.stale(c.provider)) AIModels.refresh(c.provider, key).catch(() => {});
   },
 };
+
+/* ---------- the cheapest image-capable models, refreshed from each provider ---------- */
+const prettyModel = id => String(id).replace(/^models\//, '').replace(/^gpt-/i, 'GPT-').replace(/-(luna|nano|mini|sol|flash|lite|haiku)/gi, (m, w) => ' ' + w[0].toUpperCase() + w.slice(1)).replace(/ Flash Lite/, ' Flash-Lite').replace(/^gemini/i, 'Gemini').replace(/^claude/i, 'Claude');
+const verNum = n => { const m = String(n).match(/-(\d+(?:\.\d+)?)-/); return m ? parseFloat(m[1]) : 0; };
+const AI_CHEAP = {
+  anthropic: {
+    fallback: [{ id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' }],
+    url: 'https://api.anthropic.com/v1/models?limit=1000',
+    headers: key => ({ 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }),
+    pick: d => (d.data || []).filter(m => /haiku/i.test(m.id)).map(m => ({ id: m.id, name: m.display_name || prettyModel(m.id), t: Date.parse(m.created_at) || 0 })),
+  },
+  openai: {
+    fallback: [{ id: 'gpt-6-luna', name: 'GPT-6 Luna' }, { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna' }, { id: 'gpt-5-nano', name: 'GPT-5 Nano' }],
+    url: 'https://api.openai.com/v1/models',
+    headers: key => ({ authorization: 'Bearer ' + key }),
+    pick: d => (d.data || []).filter(m => /^gpt-\d+(\.\d+)?-(luna|nano)$/.test(m.id)).map(m => ({ id: m.id, name: prettyModel(m.id), t: (+m.created || 0) * 1000 })),
+  },
+  gemini: {
+    fallback: [{ id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite' }, { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite' }],
+    url: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
+    headers: key => ({ 'x-goog-api-key': key }),
+    pick: d => (d.models || []).filter(m => /^models\/gemini-\d+(\.\d+)?-flash-lite$/.test(m.name || '') && (m.supportedGenerationMethods || []).includes('generateContent')).map(m => ({ id: m.name.replace(/^models\//, ''), name: m.displayName || prettyModel(m.name), t: verNum(m.name) })),
+  },
+};
+const AIModels = {
+  read() { try { return JSON.parse(localStorage.getItem('mj-ai-models') || '{}') || {}; } catch (e) { return {}; } },
+  entry(provider) { return this.read()[provider] || null; },
+  list(provider) { const e = this.entry(provider); return e && e.list && e.list.length ? e.list : AI_CHEAP[provider].fallback; },
+  newest(provider) { return (this.list(provider)[0] || {}).id || AI_PROVIDERS[provider].vision; },
+  stale(provider) { const e = this.entry(provider); return !e || Date.now() - (e.at || 0) > 3 * DAY; },
+  async refresh(provider, key) {
+    const C = AI_CHEAP[provider]; if (!C || !key) return null;
+    const r = await aiGet(C.url, C.headers(key)), st = r.status;
+    if (st === 401 || st === 403 || (st === 400 && /api[ _-]?key/i.test(JSON.stringify(r.data || {})))) throw { code: 'bad_key', provider };
+    if (st < 200 || st >= 300) throw { code: st === 429 ? 'rate_limited' : 'upstream_error', provider };
+    const seen = new Set(), list = C.pick(r.data || {}).sort((a, b) => b.t - a.t).filter(m => !seen.has(m.name) && seen.add(m.name)).slice(0, 4).map(({ id, name }) => ({ id, name }));
+    if (!list.length) return null;
+    const all = this.read(); all[provider] = { at: Date.now(), list };
+    try { localStorage.setItem('mj-ai-models', JSON.stringify(all)); } catch (e) {}
+    return list;
+  },
+};
+async function aiGet(url, headers) {
+  const H = Native.plugin('CapacitorHttp');
+  if (H && typeof H.request === 'function') {
+    let r; try { r = await H.request({ url, method: 'GET', headers, responseType: 'json' }); } catch (e) { throw { code: 'network' }; }
+    let data = r && r.data; if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) {} }
+    return { status: r ? r.status : 0, data };
+  }
+  let r; try { r = await fetch(url, { headers }); } catch (e) { throw { code: 'network' }; }
+  let data = null; try { data = await r.json(); } catch (e) {}
+  return { status: r.status, data };
+}
+
 async function aiPost(url, headers, body) {
   const H = Native.plugin('CapacitorHttp');
   if (H && typeof H.request === 'function') {
@@ -1180,13 +1236,15 @@ function aiClient(provider, key, modelOverride) {
     throw fail('upstream_error');
   };
   const call = async (prompt, opts = {}) => {
-    const first = modelOverride || (opts.modelTier === 'quick' ? P.quick : P.vision), text = String(prompt), imgs = [];
+    const first = modelOverride || AIModels.newest(provider), text = String(prompt), imgs = [];
     for (const im of (opts.images || [])) imgs.push({ type: /^image\/(jpeg|png|webp|gif)$/.test(im.type || '') ? im.type : 'image/jpeg', data: await toB64(im) });
     const think = provider === 'gemini' && /^gemini-3/.test(first) && !/lite/.test(first);
     try { return await attempt(first, text, imgs, think); }
     catch (e) {
-      // A heavier Gemini model hit its (often tiny) free-tier limit or timed out: try Flash-Lite once.
-      if (provider === 'gemini' && P.lite && first !== P.lite && ['rate_limited', 'not_in_tier', 'busy', 'timeout'].includes(e.code)) return attempt(P.lite, text, imgs, false);
+      // The chosen model is gone, or hit its limit: try the next cheap model once (each model has its own quota).
+      const retry = e.code === 'bad_model' || (['rate_limited', 'not_in_tier', 'busy', 'timeout'].includes(e.code) && provider === 'gemini');
+      const next = retry ? AIModels.list(provider).map(m => m.id).find(id => id !== first) || (provider === 'gemini' && P.lite !== first ? P.lite : null) : null;
+      if (next) return attempt(next, text, imgs, false);
       throw e;
     }
   };
@@ -1332,15 +1390,32 @@ function aiSettingsHTML() {
 }
 function aiBlockHTML() {
   const c = AIKeys.read(), id = F.aiProv, P = AI_PROVIDERS[id], has = !!c.keys[id];
+  if (F.aiModel === undefined || F.aiModelFor !== id) { F.aiModel = c.models[id] || ''; F.aiModelFor = id; }
+  const list = AIModels.list(id), e = AIModels.entry(id), newest = list[0];
+  if (F.aiModel && !list.some(m => m.id === F.aiModel)) F.aiModel = '';
+  const when = e && e.at ? `עודכנה ${fmtDay(new Date(e.at))}` : 'תתעדכן אחרי שמירת המפתח';
   return `<label class="field"><span class="fl">מפתח API של ${P.label}${has ? ' (שמור)' : ''}</span><input type="password" id="f-akey" autocomplete="off" spellcheck="false" dir="ltr" placeholder="${has ? 'השאירו ריק כדי לא לשנות' : P.ph}"></label>
   <p class="tiny muted" style="margin:6px 0 14px">את המפתח יוצרים באתר: <bdi>${P.site}</bdi></p>
-  <label class="field"><span class="fl">מודל (לא חובה)</span><input type="text" id="f-amodel" autocomplete="off" spellcheck="false" dir="ltr" value="${esc(c.models[id] || '')}" placeholder="${P.vision}"></label>
-  <p class="tiny muted" style="margin:6px 0 14px">אם משאירים ריק, לתמונות: <bdi>${P.vision}</bdi>. לרעיונות לארוחות: <bdi>${P.quick}</bdi>.</p>
-  <div class="chips"><button class="chip" data-act="ai-test">בדיקת החיבור</button>${has ? '<button class="chip out" data-act="akey-del" style="color:var(--alert)">הסרת המפתח</button>' : ''}</div>`;
+  <div class="field"><span class="fl">מודל</span><div class="chips" role="group" aria-label="מודל">
+    <button class="chip" data-pick="aiModel" data-val="" aria-pressed="${F.aiModel === ''}">אוטומטי — החדש ביותר${newest ? ` (<bdi>${esc(newest.name)}</bdi>)` : ''}</button>
+    ${list.map(m => `<button class="chip" data-pick="aiModel" data-val="${esc(m.id)}" aria-pressed="${F.aiModel === m.id}"><bdi>${esc(m.name)}</bdi></button>`).join('')}
+  </div>
+  <p class="tiny muted" style="margin:8px 0 0">רק המודלים הזולים ביותר שמזהים תמונות, מהחדש לישן. הרשימה ${when}. ${has ? '<button class="chip out" data-act="ai-models-refresh" style="min-height:30px;padding:4px 12px;font-size:13px">רענון</button>' : ''}</p></div>
+  <div class="chips" style="margin-top:14px"><button class="chip" data-act="ai-test">בדיקת החיבור</button>${has ? '<button class="chip out" data-act="akey-del" style="color:var(--alert)">הסרת המפתח</button>' : ''}</div>`;
+}
+// Pasting a key refreshes the model list right away, before saving.
+document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'f-akey' && F.kind === 'set' && F.aiProv && t.value.trim().length >= 20) refreshAIModels(F.aiProv, t.value.trim(), true); });
+async function refreshAIModels(provider, key, quiet) {
+  try {
+    const list = await AIModels.refresh(provider, key);
+    const sh = $('#sheet'), b = $('#f-aiblock', sh);
+    if (b && F.kind === 'set' && F.aiProv === provider) { const typed = ($('#f-akey', sh) || {}).value || ''; b.innerHTML = aiBlockHTML(); const k = $('#f-akey', sh); if (k) k.value = typed; }
+    if (!quiet) toast(list ? 'רשימת המודלים עודכנה' : 'לא נמצאו מודלים מתאימים, נשארת הרשימה המובנית');
+  } catch (e) { if (!quiet) toast(sampleErr(e), 'alert'); }
 }
 async function aiTest() {
   const sh = $('#sheet'), id = F.aiProv, P = AI_PROVIDERS[id], c = AIKeys.read();
-  const key = ((($('#f-akey', sh) || {}).value) || '').trim() || c.keys[id], model = ((($('#f-amodel', sh) || {}).value) || '').trim();
+  const key = ((($('#f-akey', sh) || {}).value) || '').trim() || c.keys[id], model = F.aiModel || '';
   if (!key) { toast('הדביקו מפתח קודם.', 'alert'); return; }
   const btn = $('[data-act="ai-test"]', sh); if (btn) { btn.disabled = true; btn.textContent = 'בודק…'; }
   try { const r = await aiClient(id, key, model).json('Reply with this JSON object only: {"ok": true}', { modelTier: 'quick' }); toast(r && r.ok ? `החיבור ל-${P.label} עובד ✓` : `${P.label} ענה, אבל בתשובה לא צפויה.`); }
@@ -3256,7 +3331,7 @@ function openSettings() {
   const st = S.core.settings, c = st.customMed || {};
   F = { kind: 'set', med: st.med || 'mounjaro', day: hasDay() ? String(st.day) : 'none', time: st.time || '09:00', start: st.start || '', dose: st.dose, per: st.perPen || curMed().perPack || 4, arms: !!st.arms, theme: getTheme(), cmName: c.name || '', cmForm: c.form || 'pen', cmFreq: c.freq || 'weekly', cmDoses: (c.doses || []).join(', '), cmUnit: c.unit || 'מ״ג', num: ['dose'] };
   if (Native.on) Object.assign(F, remToF());
-  if (BYOK_ON) F.aiProv = AIKeys.read().provider;
+  if (BYOK_ON) { F.aiProv = AIKeys.read().provider; const k = AIKeys.read().keys[F.aiProv]; if (k && AIModels.stale(F.aiProv)) setTimeout(() => refreshAIModels(F.aiProv, k, true), 300); }
   const storage = Backend.mode === 'cloud' ? 'הנתונים נשמרים באזור פרטי בחשבון שלך. אם תשתפו את הקישור, כל מי שיפתח אותו יראה רק את הנתונים של עצמו.' : (Native.on ? 'הנתונים נשמרים בטלפון הזה בלבד. הסרת האפליקציה או מחיקת הנתונים שלה תמחק גם אותם, לכן כדאי לייצא גיבוי מדי פעם.' : Local.db ? 'הנתונים נשמרים בדפדפן הזה בלבד. מחיקת נתוני הדפדפן תמחק גם אותם.' : 'אין כאן אפשרות שמירה, והנתונים יימחקו בסגירת הדף.');
   const body = `
     <h3 class="h-sub" style="margin-top:4px">התרופה</h3>
@@ -3274,7 +3349,7 @@ function openSettings() {
     <p class="disclaimer" style="margin-top:20px">המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי.</p>
     <button class="credit-line" data-act="about">MyShot · גרסה ${APP_VERSION} · פותח על ידי רן יעקבי</button>`;
   Sheet.open('הגדרות', body, '<button class="btn" data-act="set-save">שמירת ההגדרות</button>', sh => {
-    F.onChange = g => { if (g === 'theme') setTheme(F.theme); if (g === 'aiProv') { const b = $('#f-aiblock', sh); if (b) b.innerHTML = aiBlockHTML(); } medFormChange(sh, g, false); };
+    F.onChange = g => { if (g === 'theme') setTheme(F.theme); if (g === 'aiProv') { const b = $('#f-aiblock', sh); if (b) b.innerHTML = aiBlockHTML(); const k = AIKeys.read().keys[F.aiProv]; if (k && AIModels.stale(F.aiProv)) refreshAIModels(F.aiProv, k, true); } medFormChange(sh, g, false); };
   });
 }
 function settingsSave() {
@@ -3283,7 +3358,7 @@ function settingsSave() {
   const kcal = Math.round(numVal($('#f-kcal', sh))), fiber = Math.round(numVal($('#f-fiber', sh))), height = Math.round(numVal($('#f-height', sh)));
   const f = { ...F }; if (!validMedForm(f)) return;
   const m = formMed(), changed = f.med !== (S.core.settings.med || 'mounjaro');
-  const remNew = null, akey = $('#f-akey', sh) ? $('#f-akey', sh).value.trim() : '', amodel = $('#f-amodel', sh) ? $('#f-amodel', sh).value.trim().slice(0, 80) : null;
+  const remNew = null, akey = $('#f-akey', sh) ? $('#f-akey', sh).value.trim() : '', amodel = F.aiModel === undefined ? null : String(F.aiModel || '');
   if (!mutate('core', c => {
     const s = c.settings;
     s.med = f.med; if (f.med === 'custom') s.customMed = customMedFromF(f);
@@ -3305,6 +3380,7 @@ function settingsSave() {
   if (BYOK_ON && f.aiProv && AI_PROVIDERS[f.aiProv]) {
     const c = AIKeys.read(); c.provider = f.aiProv; if (akey) c.keys[f.aiProv] = akey; if (amodel !== null) c.models[f.aiProv] = amodel;
     AIKeys.write(c); AIKeys.setup();
+    if (akey || AIModels.stale(f.aiProv)) refreshAIModels(f.aiProv, c.keys[f.aiProv], true);
     if (!c.keys[f.aiProv]) aiNote = ` בלי מפתח של ${AI_PROVIDERS[f.aiProv].label}, ניתוח התמונות כבוי.`;
   }
   Sheet.close(); toast((changed ? `עברתם ל${m.name}.` : 'ההגדרות נשמרו.') + aiNote);
@@ -4065,6 +4141,7 @@ document.addEventListener('click', e => {
     case 'rem-exact': Reminders.askExact(); break;
     case 'akey-del': { const c = AIKeys.read(); delete c.keys[F.aiProv]; AIKeys.write(c); AIKeys.setup(); const b = $('#f-aiblock'); if (b) b.innerHTML = aiBlockHTML(); toast('המפתח הוסר'); break; }
     case 'ai-test': aiTest(); break;
+    case 'ai-models-refresh': { const k = ((($('#f-akey') || {}).value) || '').trim() || AIKeys.read().keys[F.aiProv]; if (k) refreshAIModels(F.aiProv, k, false); break; }
     case 'rem-page': openRemPage(); break;
     case 'theme-toggle': toggleTheme(a); break;
     case 'about': openAbout(); break;
