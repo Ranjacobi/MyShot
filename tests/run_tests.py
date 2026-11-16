@@ -666,6 +666,162 @@ async def first_run_restores_from_a_file(b):
         await ctx.close()
 
 
+EN_PRE = "if (!localStorage.getItem('__lang')) { localStorage.setItem('mj-lang', 'en'); localStorage.setItem('__lang', '1'); }\n"
+
+
+async def hebrew_on_screen(page):
+    """Visible text with Hebrew letters (the app's own text; the medical guide is stage 2)."""
+    return await page.evaluate("""() => {
+      const out = new Set(), walk = n => { for (const c of n.childNodes) {
+        if (c.nodeType === 3) { const t = c.nodeValue.trim(); if (/[\\u0590-\\u05FF]/.test(t) && c.parentElement && c.parentElement.offsetParent !== null) out.add(t.slice(0, 60)); }
+        else if (c.nodeType === 1 && !/^(SCRIPT|STYLE)$/.test(c.nodeName) && !c.hidden) walk(c); } };
+      walk(document.body);
+      document.querySelectorAll('[aria-label],[placeholder]').forEach(e => { for (const a of ['aria-label', 'placeholder']) { const v = e.getAttribute(a); if (v && /[\\u0590-\\u05FF]/.test(v) && !/Language/.test(v)) out.add(a + ': ' + v.slice(0, 50)); } });
+      return [...out].filter(t => !/^(עברית|שפה · Language)$/.test(t));
+    }""")
+
+
+@test
+async def english_interface_end_to_end(b):
+    ctx, page, errs = await open_app(b, BIO, pre=FRESH + EN_PRE)
+    try:
+        await tick(page, 3)
+        check(await page.evaluate("document.documentElement.dir") == "ltr" and await page.evaluate("document.documentElement.lang") == "en", "the page is not left-to-right English")
+        check("Welcome" in await page.inner_text("#sheet .sheet-title"), "the welcome screen is not in English")
+        found = {}
+        found["welcome"] = await hebrew_on_screen(page)
+        await page.click('[data-act="welcome-new"]'); await tick(page, 3)
+        found["setup"] = await hebrew_on_screen(page)
+        await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
+        found["lock offer"] = await hebrew_on_screen(page)
+        await page.click('[data-act="offer-skip"]'); await tick(page, 3)
+        for tab in ["home", "shots", "food", "track", "more"]:
+            await page.click(f'.tab[data-tab="{tab}"]'); await tick(page, 2); found[tab] = await hebrew_on_screen(page)
+        await page.click('.tab[data-tab="food"]'); await tick(page, 1); await page.click('[data-act="seg"][data-k="supps"]'); await tick(page, 2); found["supplements"] = await hebrew_on_screen(page)
+        await page.click('.tab[data-tab="track"]'); await tick(page, 1)
+        for seg in ["symptoms", "body", "train"]:
+            await page.click(f'[data-act="seg"][data-k="{seg}"]'); await tick(page, 2); found["track/" + seg] = await hebrew_on_screen(page)
+        await open_reminders(page); found["reminders"] = await hebrew_on_screen(page)
+        await page.click('[data-act="settings"]'); await tick(page, 2); found["settings"] = await hebrew_on_screen(page)
+        for p in ["med", "goals", "privacy", "backup"]:
+            await page.click(f'[data-act="set-go"][data-p="{p}"]'); await tick(page, 2); found["settings/" + p] = await hebrew_on_screen(page)
+            await page.click('[data-act="set-back"]'); await tick(page, 2)
+        # medical texts still waiting for stage 2 are listed in i18n_pending.json; everything else must be English
+        pending = [__import__('re').sub(r'<[^>]*>', ' ', k) for k in json.loads((HERE / "i18n_pending.json").read_text(encoding="utf-8"))]
+        def is_pending(t):
+            m = __import__('re').search('[\u0590-\u05FF]', t); frag = t[m.start():m.start() + 14] if m else t
+            return any(frag in k for k in pending)
+        bad = {k: [t for t in v if not is_pending(t)] for k, v in found.items()}
+        bad = {k: v for k, v in bad.items() if v}
+        check(not bad, f"Hebrew left on English screens: {bad}")
+        titles = await page.evaluate("__ln.scheduled.map(n => n.title + ' ' + n.body)")
+        check(titles and not [t for t in titles if __import__('re').search('[\u0590-\u05FF]', t)], f"notifications not in English: {titles[:3]}")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def english_lock_screen_and_units(b):
+    ctx, page, errs = await open_app(b, BIO + EN_PRE)
+    try:
+        await settings_page(page, "privacy")
+        await page.click('[data-act="lock-method"][data-v="bio"]'); await settle(page, 0.3, 4)
+        check("Fingerprint lock is on" in await page.inner_text("#toast"), "lock confirmation not in English")
+        await page.keyboard.press("Escape"); await tick(page, 2)
+        await page.evaluate("window.__bioFail = 'userCancel'")
+        await page.evaluate("__app.listeners.appStateChange({ isActive: false })"); await tick(page, 1)
+        await page.evaluate("__app.listeners.appStateChange({ isActive: true })"); await settle(page, 0.3, 6)
+        lock = await page.inner_text("#lock")
+        check("MyShot is locked" in lock and "Unlock with fingerprint" in lock, f"lock screen not in English: {lock[:80]}")
+        await page.evaluate("window.__bioFail = null"); await page.click('#lock [data-lock="bio"]'); await settle(page, 0.3, 6)
+        await page.click('.tab[data-tab="food"]'); await tick(page, 1); await page.click('[data-act="seg"][data-k="supps"]'); await tick(page, 2)
+        txt = await page.inner_text("#app")
+        check(__import__('re').search(r"\b1 (capsule|pill|tablet)\b", txt) or "2 " in txt, f"quantities not in English word order: {txt[:200]}")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def language_follows_the_phone_on_a_new_install(b):
+    ctx = await b.new_context(viewport={"width": 390, "height": 844}, locale="en-US", timezone_id="Asia/Jerusalem", reduced_motion="reduce")
+    page = await ctx.new_page(); errs = []
+    page.on("pageerror", lambda e: errs.append(str(e)))
+    await page.clock.install(time=__import__('datetime').datetime(2026, 11, 13, 10, 30))
+    await page.route("**/fonts.g*/**", lambda r: r.abort())
+    await ctx.add_init_script(PRE + FRESH + MOCK + CAP)
+    try:
+        await page.goto(URL, wait_until="domcontentloaded"); await page.clock.run_for(1500); await tick(page, 8); await settle(page, 0.5, 6)
+        check(await page.evaluate("localStorage.getItem('mj-lang')") == "en", "an English phone did not get English")
+        check(await page.evaluate("document.documentElement.dir") == "ltr", "the app did not reload in English")
+        check(await page.locator('#sheet.open').count() == 1 and "Welcome" in await page.inner_text("#sheet .sheet-title"), "no English welcome screen")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def existing_hebrew_user_stays_in_hebrew_and_can_switch(b):
+    ctx, page, errs = await open_app(b)
+    try:
+        check(await page.evaluate("localStorage.getItem('mj-lang')") == "he" and await page.evaluate("document.documentElement.dir") == "rtl", "an existing user did not stay in Hebrew")
+        await page.click('[data-act="settings"]'); await tick(page, 2)
+        async with page.expect_navigation():
+            await page.click('[data-act="set-lang"][data-v="en"]'); await tick(page, 2)
+        await page.clock.run_for(1500); await tick(page, 6)
+        check(await page.evaluate("document.documentElement.dir") == "ltr", "switching to English did not apply")
+        tabs = await page.evaluate("document.querySelector('.tabs').textContent")
+        check("Home" in tabs and "Injections" in tabs, f"the tab bar is not in English after switching: {tabs}")
+        await page.click('[data-act="settings"]'); await tick(page, 2)
+        async with page.expect_navigation():
+            await page.click('[data-act="set-lang"][data-v="he"]'); await tick(page, 2)
+        await page.clock.run_for(1500); await tick(page, 6)
+        check(await page.evaluate("document.documentElement.dir") == "rtl", "switching back to Hebrew did not apply")
+    finally:
+        await ctx.close()
+
+
+CANVAS_SPY = """window.__drawn = []; window.__dirs = new Set();
+const __ft = CanvasRenderingContext2D.prototype.fillText;
+CanvasRenderingContext2D.prototype.fillText = function (t, x, y, w) { __drawn.push(String(t)); __dirs.add(this.direction); return __ft.call(this, t, x, y, w); };"""
+
+
+@test
+async def english_guide_about_and_report(b):
+    ctx, page, errs = await open_app(b, BIO + CANVAS_SPY, pre=FRESH + EN_PRE)
+    try:
+        await tick(page, 3)
+        await page.click('[data-act="welcome-new"]'); await tick(page, 3)
+        await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.fill('#f-last', '2026-11-12T09:00'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
+        if await page.locator('[data-act="offer-skip"]').count(): await page.click('[data-act="offer-skip"]'); await tick(page, 2)
+        found = {}
+        await page.click('.tab[data-tab="more"]'); await tick(page, 2)
+        await page.click('.row[data-act="more-go"][data-k="guide"]'); await tick(page, 2)
+        await page.evaluate("document.querySelectorAll('#app details').forEach(d => d.open = true)"); await tick(page, 2)
+        found["guide"] = await hebrew_on_screen(page)
+        check(len(await page.inner_text("#app")) > 1500, "the guide looks empty")
+        await page.click('.tab[data-tab="more"]'); await tick(page, 2)
+        await page.click('[data-act="about"]'); await tick(page, 3)
+        await page.click('#sheet [data-act="about-ver"]'); await tick(page, 2)
+        check(await page.locator('#sheet li, #sheet .log-row, #sheet .changelog *').count() > 3, "the changelog did not open")
+        found["about"] = await hebrew_on_screen(page)
+        await page.keyboard.press("Escape"); await tick(page, 2)
+        await page.click('.tab[data-tab="more"]'); await tick(page, 2)
+        await page.click('.row[data-act="more-go"][data-k="doctor"]'); await tick(page, 2)
+        await page.click('#app [data-act="report"]'); await settle(page, 2.0, 10)
+        drawn = await page.evaluate("__drawn"); dirs = await page.evaluate("[...__dirs]")
+        heb = [t for t in drawn if __import__('re').search('[\u0590-\u05FF]', t)]
+        check(drawn and any("Treatment" in t for t in drawn), f"the report did not draw its English headings: {drawn[:6]}")
+        check(not heb, f"Hebrew in the English report: {heb[:5]}")
+        check("rtl" not in dirs, f"the English report draws right-to-left: {dirs}")
+        bad = {k: v for k, v in found.items() if v}
+        check(not bad, f"Hebrew left in English: {bad}")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
 # ---------------------------------------------------------------- runner
 
 async def main():
