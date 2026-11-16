@@ -506,6 +506,8 @@ select{appearance:auto;}
 .confetti{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
 .confetti i{position:absolute;display:block}
 @media (prefers-reduced-motion: reduce){.ab-seg{animation:none;stroke-dashoffset:0}.ab-needle{animation:none}.credit-name,.about-name{animation:none;background:none;color:var(--ink)}}
+.scan-wait{text-align:center;padding:14px 0 6px}.spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--btn);animation:spin .9s linear infinite;margin:10px auto 12px}@keyframes spin{to{transform:rotate(360deg)}}.scan-list{margin:6px 0 0;padding-inline-start:20px}.scan-list li{margin:3px 0}@media (prefers-reduced-motion: reduce){.spin{animation:none}}
+.chip[aria-pressed="true"] .faint{color:inherit;opacity:.8}
 </style>
 </head>
 <body>
@@ -759,8 +761,9 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.5.0';
 const CHANGELOG = [
+  ['1.5.0', 'צילום תוסף: זיהוי, הסבר, התאמה לטיפול, זמנים מומלצים ותזכורות, כולל תזכורת כשמתעדים ארוחה'],
   ['1.4.2', 'בחירת מודל AI מרשימה שמתעדכנת לבד: רק המודלים הזולים שמזהים תמונות'],
   ['1.4.1', 'צילום ארוחה עם זיהוי חזר לעבוד דרך המצלמה של הטלפון, ואפשר לצלם מחדש במקום זיהוי קודם'],
   ['1.4.0', 'מעבר מהיר בין מצב כהה לבהיר, קרדיט ומספר גרסה'],
@@ -844,7 +847,7 @@ function confetti(origin) {
   setTimeout(() => layer.remove(), 2200);
 }
 
-const REM_DEF = { dose: true, follow: true, followH: 0, eve: false, eveTime: '20:00', supps: true, water: false, water_: { from: '10:00', to: '20:00', every: 3 }, weigh: false, weighDay: 5, weighTime: '08:00', stock: true, backup: false, backupDay: 5, backupTime: '20:00', time2: '20:00', slots: { morning: '08:00', noon: '13:00', evening: '19:00', night: '22:00' }, custom: [] };
+const REM_DEF = { dose: true, follow: true, followH: 0, eve: false, eveTime: '20:00', supps: true, water: false, water_: { from: '10:00', to: '20:00', every: 3 }, weigh: false, weighDay: 5, weighTime: '08:00', stock: true, backup: false, backupDay: 5, backupTime: '20:00', time2: '20:00', slots: { morning: '08:00', noon: '13:00', evening: '19:00', night: '22:00', workout: '18:00' }, custom: [] };
 function remCfg() { const r = (S.core.settings && S.core.settings.rem) || {}; return { ...REM_DEF, ...r, slots: { ...REM_DEF.slots, ...(r.slots || {}) }, water_: { ...REM_DEF.water_, ...(r.water_ || {}) }, custom: Array.isArray(r.custom) ? r.custom.map(c => ({ ...c, days: Array.isArray(c.days) ? c.days.slice() : [] })) : [] }; }
 function remSave(fn) { return mutate('core', c => { const keep = S.core.settings.rem; S.core.settings.rem = c.settings.rem; const r = remCfg(); S.core.settings.rem = keep; fn(r); c.settings.rem = r; }); }
 const recentBackup = () => { try { return Date.now() - (+localStorage.getItem('mj-lastbackup') || 0) < 30 * DAY; } catch (e) { return false; } };
@@ -902,7 +905,7 @@ const Reminders = {
     this.soon(0); toast('ההתראה תגיע בעוד כמה שניות');
   },
   snooze(n, min) {
-    try { const a = this.snoozes(); a.push({ id: 8000 + (Math.floor(Date.now() / 60000) % 900), at: Date.now() + min * 60000, title: n.title || 'תזכורת', body: n.body || '', extra: n.extra || { kind: 'dose' } }); localStorage.setItem('mj-snz', JSON.stringify(a.slice(-10))); } catch (e) {}
+    try { const a = this.snoozes(); a.push({ id: 8000 + (Math.floor(Date.now() / 60000) % 900), at: Date.now() + min * 60000, title: n.title || 'תזכורת', body: n.body || '', extra: n.extra || { kind: 'dose' }, action: n.action }); localStorage.setItem('mj-snz', JSON.stringify(a.slice(-10))); } catch (e) {}
     this.soon(0);
   },
   build(now = new Date()) {
@@ -953,7 +956,7 @@ const Reminders = {
         const plan = dayPlan(day).filter(q => suppActiveOn(q.sp, ds));
         SLOT_ORDER.forEach((sl, j) => {
           const pend = plan.filter(q => q.slot === sl && takenCount(rec, q.sp, q.slot) < q.sp.qty);
-          if (pend.length) add(4000 + i * 4 + j, at(day, r.slots[sl]), `תוספים — ${SLOTS[sl]}`, pend.map(q => q.sp.name).join(', '), { kind: 'supps', date: ds, slot: sl }, 'supps', 'SUPPS');
+          if (pend.length) add(4000 + i * 8 + j, at(day, r.slots[sl]), `תוספים — ${SLOTS[sl]}`, pend.map(q => q.sp.name).join(', '), { kind: 'supps', date: ds, slot: sl }, 'supps', 'SUPPS');
         });
       }
     }
@@ -982,7 +985,7 @@ const Reminders = {
       if (!c.on || ci >= 80) return;
       customOccurrences(c, now, at).slice(0, 10).forEach((w, k) => add(9000 + ci * 10 + k, w, c.title, c.note || 'תזכורת שלך', { kind: 'custom', id: c.id }, 'general'));
     });
-    for (const z of this.snoozes()) add(z.id, new Date(z.at), z.title, z.body, z.extra, z.extra && z.extra.kind === 'test' ? 'general' : 'meds', z.action === undefined ? 'DOSE' : z.action);
+    for (const z of this.snoozes()) add(z.id, new Date(z.at), z.title, z.body, z.extra, z.extra && z.extra.kind === 'test' ? 'general' : z.extra && z.extra.kind === 'supps' ? 'supps' : 'meds', z.action === undefined ? 'DOSE' : z.action);
     return out;
   },
   flush() { if (!App.ready) return; while (this.queue.length) { try { this.handle(this.queue.shift()); } catch (e) { console.warn(e); } } },
@@ -1027,7 +1030,7 @@ function markSlotTaken(ds, slot) {
 }
 
 /* ---------- photos through the native camera (Android) ---------- */
-const PHOTO_KINDS = ['meal', 'label', 'receipt', 'progress'];
+const PHOTO_KINDS = ['meal', 'label', 'receipt', 'progress', 'supp'];
 function b64ToBlob(b64, format) {
   const bin = atob(String(b64 || '').replace(/^data:[^,]*,/, '')), u8 = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
@@ -1051,6 +1054,7 @@ function deliverPhoto(kind, blob) {
   else if (kind === 'label') handleLabelPhoto(file);
   else if (kind === 'receipt') handleReceiptFile(file);
   else if (kind === 'progress') handleProgressFile(file);
+  else if (kind === 'supp') handleSuppPhoto(file);
 }
 async function nativePhoto(kind, camera) {
   const C = Native.plugin('Camera'); if (!C) return false;
@@ -1073,6 +1077,7 @@ function restorePhoto(ev) {
   const run = () => {
     if (kind === 'meal' || kind === 'label') openMealSheet(null, null, null);
     else if (kind === 'receipt') openReceiptForm();
+    else if (kind === 'supp') { App.foodSeg = 'supps'; setTab('supps'); }
     else openPhotoSheet();
     setTimeout(() => deliverPhoto(kind, blob), 250);
   };
@@ -2474,7 +2479,7 @@ function viewMore() {
 }
 function openQuick() {
   F = { kind: 'quick' };
-  const items = [['log-inj', T().pen ? ICON.syr : ICON.pill, T().dose], canOCR() ? ['log-meal', ICON.cam, 'צילום ארוחה', 'photo'] : null, ['log-meal', ICON.bowl, 'ארוחה'], ['go-supps', ICON.pill, 'תוספים'], ['log-sym', ICON.pulse, 'תופעת לוואי'], ['log-weight', ICON.scale, 'שקילה'], ['add-receipt', ICON.rcpt, 'קבלה'], ['photo-add', ICON.img, 'תמונת התקדמות'], ['q-add', ICON.q, 'שאלה לרופא']].filter(Boolean);
+  const items = [['log-inj', T().pen ? ICON.syr : ICON.pill, T().dose], canOCR() ? ['log-meal', ICON.cam, 'צילום ארוחה', 'photo'] : null, ['log-meal', ICON.bowl, 'ארוחה'], ['go-supps', ICON.pill, 'תוספים'], canOCR() ? ['supp-photo', ICON.cam, 'צילום תוסף'] : null, ['log-sym', ICON.pulse, 'תופעת לוואי'], ['log-weight', ICON.scale, 'שקילה'], ['add-receipt', ICON.rcpt, 'קבלה'], ['photo-add', ICON.img, 'תמונת התקדמות'], ['q-add', ICON.q, 'שאלה לרופא']].filter(Boolean);
   Sheet.open('מה לתעד?', `<div class="qa">${items.map(([act, ic, l, mode], i) => `<button class="${i === 0 ? 'primary' : ''}" data-act="${act}"${mode ? ` data-mode="${mode}"` : ''}>${ic}<span>${l}</span></button>`).join('')}</div>`);
 }
 
@@ -2685,11 +2690,11 @@ function guideBody() {
 
 
 /* ================= supplements ================= */
-const SLOTS = { morning: 'בוקר', noon: 'צהריים', evening: 'ערב', night: 'לפני השינה' };
-const SLOT_ORDER = ['morning', 'noon', 'evening', 'night'];
+const SLOTS = { morning: 'בוקר', noon: 'צהריים', evening: 'ערב', night: 'לפני השינה', workout: 'אימון' };
+const SLOT_ORDER = ['morning', 'noon', 'evening', 'night', 'workout'];
 const FORMS = { pill: ['כדור', 'כדורים', 'm'], capsule: ['כמוסה', 'כמוסות', 'f'], chew: ['טבליה', 'טבליות', 'f'], powder: ['מנה', 'מנות', 'f'], shake: ['שייק', 'שייקים', 'm'], drops: ['מנה', 'מנות', 'f'], other: ['יחידה', 'יחידות', 'f'] };
 const FORM_L = { pill: 'כדור', capsule: 'כמוסה', chew: 'טבליית לעיסה', powder: 'אבקה', shake: 'שייק', drops: 'טיפות', other: 'אחר' };
-const FOOD = { with: 'עם אוכל', empty: 'על קיבה ריקה', any: 'לא משנה' };
+const FOOD = { with: 'עם אוכל', fat: 'עם ארוחה שיש בה שומן', empty: 'על קיבה ריקה', any: 'לא משנה' };
 function unitsTxt(form, n) { const f = FORMS[form] || FORMS.other; n = +n || 0; if (n === 1) return `${f[0]} ${f[2] === 'm' ? 'אחד' : 'אחת'}`; if (n === 0.5) return `חצי ${f[0]}`; return `${nf1(n)} ${f[1]}`; }
 const SUPP_PRESET = {
   'מולטי-ויטמין': { form: 'pill', slots: ['morning'], food: 'with', note: 'בשעה אחרת מתוסף הסידן' },
@@ -2717,7 +2722,7 @@ function suppNorm(x) {
   const slots = Array.isArray(x.slots) ? x.slots.filter(q => SLOTS[q]) : [];
   const days = Array.isArray(x.days) ? Array.from(new Set(x.days.map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6))) : [];
   const st = x.stock === null || x.stock === undefined || x.stock === '' ? null : Math.max(0, +x.stock || 0);
-  return { id: x.id, name: String(x.name || 'תוסף'), form: FORMS[x.form] ? x.form : 'pill', amount: String(x.amount || ''), qty: +x.qty > 0 ? Math.min(20, +x.qty) : 1, slots: slots.length ? SLOT_ORDER.filter(q => slots.includes(q)) : ['morning'], days: days.length && days.length < 7 ? days.sort((a, b) => a - b) : 'daily', food: FOOD[x.food] ? x.food : 'any', protein: Math.max(0, +x.protein || 0), kcal: Math.max(0, +x.kcal || 0), stock: st, note: String(x.note || ''), since: x.since || null };
+  return { id: x.id, name: String(x.name || 'תוסף'), form: FORMS[x.form] ? x.form : 'pill', amount: String(x.amount || ''), qty: +x.qty > 0 ? Math.min(20, +x.qty) : 1, slots: slots.length ? SLOT_ORDER.filter(q => slots.includes(q)) : ['morning'], days: days.length && days.length < 7 ? days.sort((a, b) => a - b) : 'daily', food: FOOD[x.food] ? x.food : 'any', protein: Math.max(0, +x.protein || 0), kcal: Math.max(0, +x.kcal || 0), stock: st, note: String(x.note || ''), since: x.since || null, info: x.info && typeof x.info === 'object' ? x.info : null, src: x.src || null };
 }
 const supps = () => (S.core.supps || []).filter(x => x && x.id).map(suppNorm);
 const scheduledOn = (sp, d) => sp.days === 'daily' || sp.days.includes(d.getDay());
@@ -2763,7 +2768,7 @@ function suppRowHTML(sp, slot, rec, ds, off) {
   const n = takenCount(rec, sp, slot), full = n >= sp.qty, part = n > 0 && !full;
   const sub = [sp.amount, unitsTxt(sp.form, sp.qty), sp.food !== 'any' ? FOOD[sp.food] : '', sp.protein ? `${r1(sp.protein * sp.qty)} ג׳ חלבון` : ''].filter(Boolean).join(', ');
   const a = `data-id="${esc(sp.id)}" data-slot="${slot}" data-ds="${ds}"`;
-  return `<div class="row"><button class="take${full ? ' on' : part ? ' part' : ''}" data-act="sx-take" ${a} aria-pressed="${full}" aria-label="${esc(sp.name)}, ${SLOTS[slot]}">${full ? '✓' : ''}</button><button class="rowbtn" data-act="supp-edit" data-id="${esc(sp.id)}"><div class="row-title">${esc(sp.name)}</div><div class="row-sub">${esc(sub)}</div>${off ? `<div class="row-sub faint">${daysLabel(sp)}</div>` : ''}</button>${n > 0 || sp.qty !== 1 ? `<div class="stepper"><button class="chip out" data-act="sx-dec" ${a} aria-label="פחות">−</button><span class="num">${nf1(n)}</span><button class="chip out" data-act="sx-inc" ${a} aria-label="עוד">+</button></div>` : ''}</div>`;
+  return `<div class="row"><button class="take${full ? ' on' : part ? ' part' : ''}" data-act="sx-take" ${a} aria-pressed="${full}" aria-label="${esc(sp.name)}, ${SLOTS[slot]}">${full ? '✓' : ''}</button><button class="rowbtn" data-act="supp-edit" data-id="${esc(sp.id)}"><div class="row-title">${esc(sp.name)}${sp.info && sp.info.verdict !== 'ok' ? ` <span aria-label="${VERDICT[sp.info.verdict] ? VERDICT[sp.info.verdict][1] : ''}" title="${VERDICT[sp.info.verdict] ? VERDICT[sp.info.verdict][1] : ''}">⚠️</span>` : ''}</div><div class="row-sub">${esc(sub)}</div>${off ? `<div class="row-sub faint">${daysLabel(sp)}</div>` : ''}</button>${n > 0 || sp.qty !== 1 ? `<div class="stepper"><button class="chip out" data-act="sx-dec" ${a} aria-label="פחות">−</button><span class="num">${nf1(n)}</span><button class="chip out" data-act="sx-inc" ${a} aria-label="עוד">+</button></div>` : ''}</div>`;
 }
 function suppHistoryHTML(list) {
   const days = []; for (let i = 6; i >= 0; i--) days.push(addDays(startOfDay(new Date()), -i));
@@ -2796,7 +2801,9 @@ function suppsBody() {
   const ds = App.suppDay, date = parseDT(ds), list = supps(), rec = S.daily.days[ds] || {}, isToday = ds === today, ago = dayDiff(new Date(), date);
   let h = '';
   h += `<div class="daynav"><button class="icon-btn" data-act="sd-prev" aria-label="היום הקודם">${ICON.chevR}</button><div class="center"><div class="row-title">${isToday ? 'היום' : ago === 1 ? 'אתמול' : fmtDay(date)}</div><div class="row-sub">${isToday || ago === 1 ? fmtDay(date) : fmtDY(date)}</div></div><button class="icon-btn" data-act="sd-next" aria-label="היום הבא"${isToday ? ' disabled' : ''}>${ICON.chev}</button></div>`;
-  if (!list.length) return h + `<h2 class="h-section">התוספים שלך</h2><p class="lead">הוסיפו את התוספים שאתם נוטלים — מה, כמה, מתי ובאילו ימים — וסמנו כל יום מה נלקח. שייק חלבון נכנס גם לסיכום החלבון היומי.</p><button class="btn block" data-act="supp-new">${ICON.plus} הוספת תוסף</button>` + suggestChipsHTML(list) + suppTipsHTML();
+  const scanRow = scanButtonsHTML(true) ? `<div class="btn-row" style="margin-top:12px">${scanButtonsHTML(true)}</div>` : '';
+  if (!list.length) return h + scanRow + `<h2 class="h-section">התוספים שלך</h2><p class="lead">הוסיפו את התוספים שאתם נוטלים — מה, כמה, מתי ובאילו ימים — וסמנו כל יום מה נלקח. שייק חלבון נכנס גם לסיכום החלבון היומי.</p><button class="btn block" data-act="supp-new">${ICON.plus} הוספת תוסף</button>` + suggestChipsHTML(list) + suppTipsHTML();
+  h += scanRow;
   const plan = dayPlan(date), done = plan.filter(q => takenCount(rec, q.sp, q.slot) >= q.sp.qty).length;
   if (plan.length) { const pc = Math.round(done / plan.length * 100); h += `<div class="group" style="margin-top:12px"><div class="row col"><div class="rowline"><span class="row-title">${done === plan.length ? 'הכול נלקח' : `נלקחו ${done} מתוך ${plan.length}`}</span><span class="row-sub num">${pc}%</span></div><div class="pbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pc}"><i style="width:${pc}%"></i></div></div></div>`; }
   const sched = list.filter(sp => scheduledOn(sp, date) && suppActiveOn(sp, ds));
@@ -2825,7 +2832,8 @@ function openSuppEdit(id, preset) {
   const name = x || (preset && preset.name) ? sp.name : '', tip = suppTip(name), showP = sp.form === 'powder' || sp.form === 'shake' || sp.protein > 0;
   const body = `
     <label class="field"><span class="fl">שם התוסף</span><input type="text" id="f-sn" maxlength="40" value="${esc(name)}" placeholder="למשל: ויטמין D"${name ? '' : ' data-autofocus'}></label>
-    <div id="f-stip">${tip ? `<div class="tips"><h4>מתי כדאי לקחת</h4><p style="margin:0">${tip}</p></div>` : ''}</div>
+    <div id="f-stip">${tip && !sp.info ? `<div class="tips"><h4>מתי כדאי לקחת</h4><p style="margin:0">${tip}</p></div>` : ''}</div>
+    ${x ? suppInfoHTML(sp) : ''}${x && canOCR() ? `<div class="btn-row" style="margin:4px 0 14px">${scanButtonsHTML(false).replace(/צילום תוסף/, sp.info ? 'סריקה מחדש' : 'סריקת התווית')}</div>` : ''}
     <div class="field"><span class="fl">צורה</span><div class="chips" role="group" aria-label="צורה">${Object.entries(FORM_L).map(([k, l]) => `<button class="chip" data-pick="form" data-val="${k}" aria-pressed="${F.form === k}">${l}</button>`).join('')}</div></div>
     <div class="two"><label class="field"><span class="fl">מינון (כמו שכתוב באריזה)</span><input type="text" id="f-sa" maxlength="30" value="${esc(sp.amount)}" placeholder="למשל: 1000 יחב״ל"></label>
     <div class="field"><span class="fl">כמה בכל פעם</span><div class="stepper" style="justify-content:space-between;min-height:48px"><button class="chip out" data-act="sq" data-n="-0.5" aria-label="פחות">−</button><span id="f-sq" style="flex:1">${unitsTxt(F.form, F.qty)}</span><button class="chip out" data-act="sq" data-n="0.5" aria-label="עוד">+</button></div></div></div>
@@ -2840,6 +2848,170 @@ function openSuppEdit(id, preset) {
     F.onChange = g => { if (g === 'form') { const q = $('#f-sq', sh); if (q) q.textContent = unitsTxt(F.form, F.qty); const pp = $('#f-sprot', sh); if (pp && (F.form === 'powder' || F.form === 'shake')) pp.hidden = false; } };
   });
 }
+
+/* ---------- supplement scan: read the label, explain, fit to the treatment, schedule ---------- */
+const SUPP_RULES = [
+  { re: /fat ?burn|thermogen|שורף|שורפי|garcinia|גרסיניה|synephrine|סינפרין|yohimb|יוהימב|raspberry ketone|green coffee|קפה ירוק|green tea extract|תמצית תה ירוק|egcg|ephedr|אפדר/i, v: 'caution', note: 'נראה כמו תוסף להרזיה או ממריץ. עם טיפול שכבר מוריד תיאבון ומשפיע על מערכת העיכול, לא כדאי לשלב בלי אישור רופא.' },
+  { re: /senna|סנה|laxative|משלשל|bisacodyl|cascara|detox|דיטוקס|diuretic|משתן|dandelion|שן הארי/i, v: 'caution', note: 'משלשלים, משתנים ותוספי ״ניקוי״ עלולים להגביר התייבשות ואיבוד מלחים, במיוחד כשיש בחילות או שלשולים מהטיפול. רק בהתייעצות עם הרופא.' },
+  { re: /st\.? ?john|hypericum|היפריקום|פרע מחורר/i, v: 'caution', note: 'היפריקום ידוע באינטראקציות עם תרופות רבות, כולל גלולות למניעת הריון. כדאי לשאול רוקח לפני שמשלבים.' },
+  { re: /psyllium|פסיליום|metamucil|fiber supplement|סיבים תזונתיים|inulin|אינולין|glucomannan|גלוקומנן/i, spacing: 'סיבים: עם כוס מים מלאה, ובהפרש של לפחות שעתיים מתרופות ותוספים אחרים.' },
+];
+const VRANK = { ok: 0, caution: 1, avoid: 2 };
+function suppScanPrompt(m, others) {
+  const med = `${m.name}${m.gen ? ` (${m.gen})` : ''}, ${m.form === 'pen' ? 'injection' : 'pill'}, ${m.freq === 'weekly' ? 'once a week' : m.freq === 'meals' ? 'with meals' : 'daily'}`;
+  return `The image shows a dietary supplement product (bottle, box or label). The user is being treated for weight management with ${med}.${m.how ? ` Medication instructions: ${m.how}` : ''}
+Their other supplements: ${others.length ? others.join(', ') : 'none'}.
+Read the label carefully and return one JSON object:
+{"isSupplement": true or false,
+ "name": product name, short (max 40 chars), in Hebrew if the label is Hebrew, otherwise as printed,
+ "brand": brand or "",
+ "form": one of "pill","capsule","chew","powder","shake","drops","other",
+ "amount": the main active amount per serving as printed (e.g. "2000 IU", "500 mg"), or "",
+ "ingredients": up to 8 items [{"name": Hebrew name, "amount": as printed}],
+ "labelDose": the label's directions, translated to Hebrew; "" if not readable. Never invent a dose,
+ "qty": units per serving per the label (default 1),
+ "protein": grams of protein per serving if printed, else 0, "kcal": kcal per serving if printed, else 0,
+ "food": "with" | "fat" (absorbed better with a meal that contains fat: vitamins A, D, E, K, omega-3) | "empty" | "any",
+ "slots": recommended times from ["morning","noon","evening","night","workout"], one per daily serving; use "workout" only for products meant around exercise,
+ "benefit": 1-2 short Hebrew sentences: what it contributes,
+ "fit": 1-2 short Hebrew sentences: how it fits weight loss and treatment with ${m.name} (for example muscle preservation, nutrient gaps from a smaller appetite, effect on nausea or constipation),
+ "timing": one short Hebrew sentence explaining the recommended timing, including before or after a workout when relevant,
+ "spacing": short Hebrew notes about separating it from other supplements or medicines (may be empty),
+ "verdict": "ok" | "caution" | "avoid" ("avoid" for products not advisable with this treatment, such as fat burners or stimulant, laxative or diuretic weight-loss products; "caution" when a doctor or pharmacist should confirm),
+ "cautions": short Hebrew notes (may be empty),
+ "confidence": "high" | "medium" | "low"}
+Rules: base amounts and doses only on the label and never suggest more than it says. This is general information, not personal medical advice. If unsure, use "caution" and say why.`;
+}
+function normalizeSuppScan(x) {
+  if (!x || typeof x !== 'object' || x.isSupplement === false) return null;
+  const str = (v, n) => typeof v === 'string' ? v.trim().slice(0, n) : '';
+  const arr = (v, n, m) => Array.isArray(v) ? v.map(q => str(q, m)).filter(Boolean).slice(0, n) : [];
+  const name = str(x.name, 40); if (!name) return null;
+  const slots = Array.isArray(x.slots) ? SLOT_ORDER.filter(sl => x.slots.includes(sl)) : [];
+  return { name, brand: str(x.brand, 40), form: FORMS[x.form] ? x.form : 'pill', amount: str(x.amount, 30),
+    ingredients: Array.isArray(x.ingredients) ? x.ingredients.filter(q => q && typeof q.name === 'string' && q.name.trim()).slice(0, 8).map(q => ({ name: str(q.name, 40), amount: str(q.amount, 24) })) : [],
+    labelDose: str(x.labelDose, 160), qty: +x.qty > 0 ? Math.min(20, Math.round(+x.qty * 2) / 2) : 1,
+    protein: Math.max(0, Math.min(200, +x.protein || 0)), kcal: Math.max(0, Math.min(2000, +x.kcal || 0)),
+    food: FOOD[x.food] ? x.food : 'any', slots: slots.length ? slots : ['morning'],
+    benefit: str(x.benefit, 300), fit: str(x.fit, 300), timing: str(x.timing, 240), spacing: arr(x.spacing, 4, 160),
+    verdict: VRANK[x.verdict] !== undefined ? x.verdict : 'caution', cautions: arr(x.cautions, 5, 200),
+    confidence: ['high', 'medium', 'low'].includes(x.confidence) ? x.confidence : 'medium' };
+}
+// Checks the app always applies itself, on top of what the AI says.
+function suppSafety(r, m, others) {
+  const text = [r.name, r.brand, r.amount, ...r.ingredients.map(i => i.name)].join(' ');
+  let v = r.verdict; const cautions = r.cautions.slice(), spacing = r.spacing.slice();
+  const addC = t => { if (!cautions.includes(t)) cautions.push(t); }, addS = t => { if (!spacing.includes(t)) spacing.push(t); };
+  for (const rule of SUPP_RULES) if (rule.re.test(text)) { if (rule.v && VRANK[rule.v] > VRANK[v]) v = rule.v; if (rule.note) addC(rule.note); if (rule.spacing) addS(rule.spacing); }
+  const isCa = /calcium|סידן/i.test(text), isFe = /\biron\b|ברזל/i.test(text), oth = others.join(' ');
+  if ((isCa && /\biron\b|ברזל/i.test(oth)) || (isFe && /calcium|סידן/i.test(oth))) addS('סידן וברזל: להפריד ביניהם, כי סידן מפריע לספיגת ברזל.');
+  if (m.fast) addS(`לא יחד עם ${m.name}: אותו לוקחים לבד עם מעט מים, ותוספים רק 30 דקות אחריו.`);
+  if (r.confidence === 'low') { addC('הזיהוי לא בטוח. בדקו שהשם והמינון נכונים לפי האריזה.'); if (v === 'ok') v = 'caution'; }
+  return { verdict: v, cautions: cautions.slice(0, 6), spacing: spacing.slice(0, 5) };
+}
+const VERDICT = { ok: ['info', 'מתאים לשילוב עם הטיפול'], caution: ['warn', 'כדאי לבדוק עם הרופא או הרוקח'], avoid: ['alert', 'לא מומלץ לקחת בלי אישור רופא'] };
+function scanButtonsHTML(primary) {
+  if (!canOCR()) return BYOK_ON ? `<button class="chip" data-act="ai-setup">${ICON.cam}צילום וזיהוי — צריך מפתח AI</button>` : '';
+  return `<label class="btn${primary ? '' : ' secondary'} file-btn">${ICON.cam} צילום תוסף<input type="file" accept="image/*" capture="environment" data-file="supp"></label><label class="btn secondary file-btn">${ICON.img} מהגלריה<input type="file" accept="image/*" data-file="supp"></label>`;
+}
+function startSuppPhoto(camera) {
+  if (Native.on && Native.plugin('Camera')) { nativePhoto('supp', camera); return; }
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; if (camera) inp.setAttribute('capture', 'environment'); inp.style.display = 'none';
+  document.body.appendChild(inp); inp.addEventListener('change', () => { const f = inp.files && inp.files[0]; inp.remove(); handleSuppPhoto(f); }); inp.click();
+}
+function morningFixHTML() {
+  const m = curMed(), r = remCfg(), pill = S.core.settings.time || '08:00';
+  if (!m.fast || !F.slots || !F.slots.includes('morning') || hm2min(r.slots.morning) >= hm2min(pill) + 30) return '';
+  const fix = min2hm(hm2min(pill) + 30);
+  return `<div class="note warn">את ${esc(m.name)} לוקחים לבד על קיבה ריקה, ומחכים 30 דקות לפני כל דבר אחר. תוספי הבוקר מתוזמנים ל-${r.slots.morning}, וזה מוקדם מדי.<div style="margin-top:8px"><button class="chip" data-act="scan-fix-morning" data-v="${fix}">להזיז ל-${fix}</button></div></div>`;
+}
+function openSuppScan(editId) {
+  F = { kind: 'suppscan', editId: editId || null, status: 'loading', res: null, slots: [], food: 'any', qty: 1, form: 'pill', days: 'daily', num: [] };
+  Sheet.open(editId ? 'סריקה מחדש של התוסף' : 'זיהוי תוסף', '<div id="f-scan"></div><div id="f-aux"></div>', '', sh => {
+    F.onChange = g => { if (g === 'slots') { const fx = $('#f-scanfix', sh); if (fx) fx.innerHTML = morningFixHTML(); } };
+    renderSuppScan();
+  });
+}
+function renderSuppScan() {
+  const box = $('#f-scan'); if (!box || F.kind !== 'suppscan') return;
+  if (F.status === 'loading') { box.innerHTML = `<div class="scan-wait"><div class="spin" aria-hidden="true"></div><p class="lead" style="margin:0">קורא את התווית ובודק איך התוסף משתלב עם ${esc(curMed().name)}…</p></div>`; return; }
+  if (F.status === 'error') { box.innerHTML = `<div class="note warn">${esc(F.err || 'משהו השתבש. נסו שוב.')}</div><div class="btn-row" style="margin-top:12px">${scanButtonsHTML(true)}</div>`; return; }
+  const r = F.res, m = curMed(), v = VERDICT[r.verdict], rc = remCfg();
+  box.innerHTML = `
+    <div class="note ${v[0]}"><b>${v[1]}</b>${r.cautions.length ? `<ul class="scan-list">${r.cautions.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}</div>
+    <label class="field"><span class="fl">שם התוסף</span><input type="text" id="f-sn" maxlength="40" value="${esc(F.name)}"></label>
+    ${r.brand ? `<p class="tiny muted" style="margin:-6px 0 10px">${esc(r.brand)}</p>` : ''}
+    ${r.benefit ? `<div class="tips"><h4>מה הוא תורם</h4><p style="margin:0">${esc(r.benefit)}</p></div>` : ''}
+    ${r.fit ? `<div class="tips"><h4>איך משתלב עם הירידה במשקל ועם ${esc(m.name)}</h4><p style="margin:0">${esc(r.fit)}</p></div>` : ''}
+    <div class="tips"><h4>מה כתוב בתווית</h4>${r.labelDose ? `<p style="margin:0 0 6px"><b>הוראות:</b> ${esc(r.labelDose)}</p>` : '<p style="margin:0 0 6px">לא הצלחנו לקרוא את הוראות המינון. בדקו על האריזה.</p>'}${r.ingredients.length ? `<ul class="scan-list">${r.ingredients.map(x => `<li>${esc(x.name)}${x.amount ? ` — <bdi>${esc(x.amount)}</bdi>` : ''}</li>`).join('')}</ul>` : ''}</div>
+    <h3 class="h-sub">מתי לקחת</h3>
+    ${r.timing ? `<p class="small" style="margin-top:-4px">${esc(r.timing)}</p>` : ''}
+    ${r.spacing.length ? `<ul class="scan-list small">${r.spacing.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    <div class="field"><span class="fl">באיזה זמן ביום (אפשר כמה)</span><div class="chips" data-multi role="group" aria-label="מתי ביום">${SLOT_ORDER.map(k => `<button class="chip" data-pick="slots" data-val="${k}" aria-pressed="${F.slots.includes(k)}">${SLOTS[k]} <span class="faint num">${rc.slots[k]}</span></button>`).join('')}</div></div>
+    <div id="f-scanfix">${morningFixHTML()}</div>
+    <div class="field"><span class="fl">עם אוכל?</span><div class="chips" role="group" aria-label="עם אוכל">${Object.entries(FOOD).map(([k, l]) => `<button class="chip" data-pick="food" data-val="${k}" aria-pressed="${F.food === k}">${l}</button>`).join('')}</div></div>
+    <div class="field"><span class="fl">כמה בכל פעם</span><div class="stepper" style="justify-content:space-between;min-height:48px;max-width:280px"><button class="chip out" data-act="sq" data-n="-0.5" aria-label="פחות">−</button><span id="f-sq" style="flex:1">${unitsTxt(F.form, F.qty)}</span><button class="chip out" data-act="sq" data-n="0.5" aria-label="עוד">+</button></div></div>
+    <p class="disclaimer" style="margin-top:14px">המידע מבוסס על התווית ועל הערכה של בינה מלאכותית, ואינו ייעוץ רפואי. לפני שמוסיפים או משנים תוספים כדאי להתייעץ עם הרופא או הרוקח.</p>
+    <div class="btn-row" style="margin-top:14px"><button class="btn${r.verdict === 'avoid' ? ' secondary' : ''}" data-act="scan-save">${F.editId ? 'עדכון התוסף' : r.verdict === 'avoid' ? 'להוסיף בכל זאת' : 'הוספה לרשימה'}</button></div>
+    <p class="tiny muted" style="margin:14px 0 6px">לא זה? אפשר לצלם שוב:</p><div class="btn-row">${scanButtonsHTML(false)}</div>`;
+}
+async function handleSuppPhoto(file) {
+  if (!file) return;
+  if (!canOCR()) { toast('זיהוי מתמונה לא זמין כאן.', 'alert'); return; }
+  const editId = F.kind === 'suppedit' ? F.id : F.kind === 'suppscan' ? F.editId : null;
+  openSuppScan(editId);
+  const blob = await imageForAI(file);
+  if (F.kind !== 'suppscan') return;
+  if (!blob) { F.status = 'error'; F.err = 'לא הצלחנו לקרוא את התמונה. נסו תמונה אחרת.'; renderSuppScan(); return; }
+  const m = curMed(), others = supps().filter(sp => sp.id !== editId).map(sp => sp.name);
+  let raw = null;
+  try { raw = await App.sample.json(suppScanPrompt(m, others), { images: [blob] }); }
+  catch (e) { if (F.kind === 'suppscan') { F.status = 'error'; F.err = sampleErr(e); renderSuppScan(); } return; }
+  if (F.kind !== 'suppscan') return;
+  const res = normalizeSuppScan(raw);
+  if (!res) { F.status = 'error'; F.err = raw && raw.isSupplement === false ? 'זה לא נראה כמו תוסף תזונה. צלמו את התווית או את הקופסה.' : 'לא הצלחנו לקרוא את התווית. נסו לצלם מקרוב, ישר ובתאורה טובה.'; renderSuppScan(); return; }
+  Object.assign(res, suppSafety(res, m, others));
+  Object.assign(F, { status: 'done', res, name: res.name, form: res.form, qty: res.qty, slots: res.slots.slice(), food: res.food });
+  renderSuppScan();
+}
+function suppScanSave() {
+  const sh = $('#sheet'), r = F.res; if (!r) return;
+  const name = ((($('#f-sn', sh) || {}).value) || '').trim().slice(0, 40) || r.name;
+  if (!F.slots.length) { toast('בחרו מתי ביום.', 'alert'); return; }
+  const info = { brand: r.brand, ingredients: r.ingredients, labelDose: r.labelDose, benefit: r.benefit, fit: r.fit, timing: r.timing, spacing: r.spacing, cautions: r.cautions, verdict: r.verdict, med: curMed().id, at: todayStr() };
+  const rec = { name, form: r.form, amount: r.amount, qty: F.qty, slots: SLOT_ORDER.filter(q => F.slots.includes(q)), food: F.food, protein: r.protein, kcal: r.kcal, info, src: 'photo' };
+  const f = { ...F };
+  if (!mutate('core', c => { if (!c.supps) c.supps = []; if (f.editId) { const x = c.supps.find(q => q.id === f.editId); if (x) Object.assign(x, rec); } else c.supps.push({ id: uid(), since: todayStr(), days: 'daily', stock: null, note: '', ...rec }); })) return;
+  Sheet.close();
+  const rc = remCfg(), when = rec.slots.map(sl => `${SLOTS[sl]} ${rc.slots[sl]}`).join(', ');
+  toast(Native.on && !rc.supps ? `${name} נוסף. התזכורות לתוספים כבויות, ואפשר להפעיל אותן במסך התזכורות.` : `${name} ${f.editId ? 'עודכן' : 'נוסף'}. תזכורת: ${when}`);
+}
+function suppInfoHTML(sp) {
+  const i = sp.info; if (!i) return '';
+  const v = VERDICT[i.verdict] || VERDICT.caution, notes = (i.spacing || []).concat(i.cautions || []);
+  return `<details class="tips"${i.verdict !== 'ok' ? ' open' : ''}><summary><b>מה כדאי לדעת</b> · ${v[1]}</summary>
+    ${i.benefit ? `<p style="margin:8px 0 0"><b>מה הוא תורם:</b> ${esc(i.benefit)}</p>` : ''}${i.fit ? `<p style="margin:6px 0 0"><b>עם הטיפול:</b> ${esc(i.fit)}</p>` : ''}${i.timing ? `<p style="margin:6px 0 0"><b>מתי:</b> ${esc(i.timing)}</p>` : ''}
+    ${notes.length ? `<ul class="scan-list">${notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}${i.labelDose ? `<p style="margin:6px 0 0"><b>לפי התווית:</b> ${esc(i.labelDose)}</p>` : ''}
+    <p class="tiny muted" style="margin:8px 0 0">נסרק ב-${fmtD(parseDT(i.at))}${i.med && i.med !== curMed().id ? '. מאז החלפת תרופה, אז כדאי לסרוק מחדש' : ''}.</p></details>`;
+}
+// Logging a meal reminds you of the supplements that go with it.
+const MEAL_SLOT = { breakfast: 'morning', lunch: 'noon', dinner: 'evening' };
+function mealSuppCheck(ds, entry) {
+  if (ds !== todayStr() || Sheet.isOpen()) return;
+  const now = new Date(), [h, mi] = String(entry.t).split(':').map(Number), mt = new Date(now); mt.setHours(h || 0, mi || 0, 0, 0);
+  if (Math.abs(now - mt) > 3 * HOUR) return;
+  const rc = remCfg(), mins = (h || 0) * 60 + (mi || 0);
+  const slot = MEAL_SLOT[entry.meal] || SLOT_ORDER.filter(sl => sl !== 'workout').map(sl => [sl, Math.abs(hm2min(rc.slots[sl]) - mins)]).sort((a, b) => a[1] - b[1])[0][0];
+  const rec = S.daily.days[ds] || {};
+  const due = dayPlan(parseDT(ds)).filter(q => q.slot === slot && (q.sp.food === 'with' || q.sp.food === 'fat') && takenCount(rec, q.sp, q.slot) < q.sp.qty);
+  if (!due.length) return;
+  const fat = (entry.items || []).reduce((a, it) => a + (+itemVals(it).f || 0), 0);
+  F = { kind: 'mealsupp', ds, slot, ids: due.map(q => q.sp.id), names: due.map(q => q.sp.name) };
+  const body = `<p class="lead" style="margin-top:4px">אלה נלקחים עם הארוחה:</p><div class="group">${due.map(q => `<div class="row"><button class="take on" data-act="ms-toggle" data-id="${esc(q.sp.id)}" aria-pressed="true" aria-label="${esc(q.sp.name)}">✓</button><div class="grow"><div class="row-title">${esc(q.sp.name)}</div><div class="row-sub">${esc([q.sp.amount, unitsTxt(q.sp.form, q.sp.qty), FOOD[q.sp.food]].filter(Boolean).join(', '))}</div></div></div>`).join('')}</div>
+    ${due.some(q => q.sp.food === 'fat') && fat < 5 ? '<div class="note info">חלק מהתוספים נספגים טוב יותר עם מעט שומן, ובארוחה הזו כמעט אין. כפית שמן זית, טחינה או כמה אגוזים יעזרו.</div>' : ''}`;
+  Sheet.open('הזמן לתוספים', body, `<button class="btn secondary" data-act="ms-later">${Native.on ? 'תזכירו לי בעוד 20 דקות' : 'אחר כך'}</button><button class="btn" data-act="ms-take">לקחתי</button>`);
+}
+
 function suppEditSave() {
   const sh = $('#sheet'), name = ($('#f-sn', sh).value || '').trim().slice(0, 40);
   if (!name) { toast('כתבו את שם התוסף.', 'alert'); return; }
@@ -3736,6 +3908,7 @@ function mealSave() {
   });
   if (f.saveFav) { const name = ((($('#f-favname', sh) || {}).value || '').trim() || `${MEALS[entry.meal]} ${fmtD(parseDT(ds))}`).slice(0, 40); mutate('core', c => { if (!c.favs) c.favs = []; c.favs.push({ id: uid(), name, servings: 1, items: entry.items.map(cleanItem) }); }); }
   Sheet.close(); toast(f.id ? 'השינויים נשמרו' : 'הארוחה נשמרה');
+  if (!f.id) setTimeout(() => mealSuppCheck(ds, entry), 400);
 }
 async function mealDel() {
   const id = F.id, ds = F.ds; if (!id) return;
@@ -4157,6 +4330,12 @@ document.addEventListener('click', e => {
     case 'rem-cdel': { const id = F.id; if (remSave(r => { r.custom = r.custom.filter(x => x.id !== id); })) { Sheet.close(); toast('התזכורת נמחקה'); } break; }
     case 'rc-day': { const v = +d.v, i = F.days.indexOf(v); if (i >= 0) F.days.splice(i, 1); else F.days.push(v); a.setAttribute('aria-pressed', String(i < 0)); break; }
     case 'backup-drive': backupToDrive(); break;
+    case 'supp-photo': Sheet.close(); App.foodSeg = 'supps'; App.suppDay = todayStr(); setTab('supps'); setTimeout(() => startSuppPhoto(true), 120); break;
+    case 'scan-save': suppScanSave(); break;
+    case 'scan-fix-morning': { const v = d.v; if (/^\d{2}:\d{2}$/.test(v)) remSave(r => { r.slots.morning = v; }); const fx = $('#f-scanfix'); if (fx) fx.innerHTML = morningFixHTML(); renderSuppScan(); toast(`תוספי הבוקר זזו ל-${v}`); break; }
+    case 'ms-toggle': { const id = d.id, on = a.getAttribute('aria-pressed') !== 'true'; a.setAttribute('aria-pressed', String(on)); a.classList.toggle('on', on); a.textContent = on ? '✓' : ''; F.ids = on ? Array.from(new Set([...(F.ids || []), id])) : (F.ids || []).filter(x => x !== id); break; }
+    case 'ms-take': { const f = { ...F }, list = supps(); let n = 0; for (const id of f.ids || []) { const sp = list.find(q => q.id === id); if (sp) { setTaken(f.ds, sp, f.slot, sp.qty); n++; } } Sheet.close(); toast(n ? 'סומן שלקחת ✓' : 'לא סומן דבר'); break; }
+    case 'ms-later': { const f = { ...F }; Sheet.close(); if (Native.on) { Reminders.snooze({ title: 'לא לשכוח את התוספים', body: (f.names || []).join(', '), extra: { kind: 'supps', date: f.ds, slot: f.slot }, action: 'SUPPS' }, 20); toast('נזכיר בעוד 20 דקות'); } break; }
     case 'meal-rephoto': {
       readItemEditor(); F.editIdx = null;
       if (F.aiBatch) { const old = new Set(F.aiBatch); F.items = F.items.filter(x => !old.has(x)); F.aiBatch = null; renderItems(); }
@@ -4181,6 +4360,7 @@ document.addEventListener('change', e => {
   else if (t.matches('input[data-file="meal"]')) { const f = t.files && t.files[0]; t.value = ''; handleMealPhoto(f); }
   else if (t.matches('input[data-file="label"]')) { const f = t.files && t.files[0]; t.value = ''; handleLabelPhoto(f); }
   else if (t.matches('input[data-file="progress"]')) { const f = t.files && t.files[0]; handleProgressFile(f); }
+  else if (t.matches('input[data-file="supp"]')) { const f = t.files && t.files[0]; t.value = ''; handleSuppPhoto(f); }
   else if ((t.id === 'f-ca' || t.id === 'f-cb') && F.kind === 'cmp') { F[t.id === 'f-ca' ? 'a' : 'b'] = t.value; renderCompare($('#sheet')); }
 });
 
