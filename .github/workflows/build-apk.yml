@@ -35,8 +35,8 @@ jobs:
         run: |
           if [ ! -d android ]; then
             npx cap add android
-            node scripts/patch-android.mjs
           fi
+          node scripts/patch-android.mjs
           npx capacitor-assets generate --android
           npx cap sync android
 
@@ -63,10 +63,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           TAG="build-${GITHUB_RUN_NUMBER}"
+          VER=$(grep -oE "APP_VERSION = '[0-9]+\.[0-9]+\.[0-9]+'" www/index.html | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" MyShot.apk --clobber
           else
-            gh release create "$TAG" MyShot.apk --target "$GITHUB_SHA" --title "MyShot build ${GITHUB_RUN_NUMBER}" --notes "Built from commit ${GITHUB_SHA::7}." --latest
+            gh release create "$TAG" MyShot.apk --target "$GITHUB_SHA" --title "MyShot ${VER} (build ${GITHUB_RUN_NUMBER})" --notes "Built from commit ${GITHUB_SHA::7}." --latest
           fi
 
       # Optional: signed release APK + AAB for Google Play. Runs only if the four signing secrets are set.

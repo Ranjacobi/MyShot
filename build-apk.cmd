@@ -21,9 +21,9 @@ if errorlevel 1 exit /b 1
 if not exist android (
   call npx cap add android
   if errorlevel 1 exit /b 1
-  call node scripts\patch-android.mjs
-  if errorlevel 1 exit /b 1
 )
+call node scripts\patch-android.mjs
+if errorlevel 1 exit /b 1
 call npx capacitor-assets generate --android
 if errorlevel 1 exit /b 1
 call npx cap sync android

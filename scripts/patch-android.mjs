@@ -32,6 +32,28 @@ for (const d of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
 }
 console.log('✓ אייקון ההתראות הועתק');
 
+// Follow the phone's dark mode: WebView sets prefers-color-scheme from the activity theme.
+const styles = path.join(root, 'android/app/src/main/res/values/styles.xml');
+if (fs.existsSync(styles)) {
+  const st = fs.readFileSync(styles, 'utf8');
+  const next = st.replace(/(<style\s+name="AppTheme\.NoActionBar"\s+parent=")[^"]*(")/, '$1Theme.AppCompat.DayNight.NoActionBar$2');
+  if (next !== st) fs.writeFileSync(styles, next);
+  console.log('✓ ערכת הנושא עוקבת אחרי מצב כהה בטלפון');
+}
+
+// Version: APP_VERSION in www/index.html is the single source.
+const html = fs.readFileSync(path.join(root, 'www/index.html'), 'utf8');
+const ver = html.match(/const APP_VERSION = '(\d+)\.(\d+)\.(\d+)'/);
+const gradle = path.join(root, 'android/app/build.gradle');
+if (ver && fs.existsSync(gradle)) {
+  const name = `${ver[1]}.${ver[2]}.${ver[3]}`, code = +ver[1] * 10000 + +ver[2] * 100 + +ver[3];
+  const g = fs.readFileSync(gradle, 'utf8')
+    .replace(/versionCode(\s*=?\s*)\d+/, `versionCode$1${code}`)
+    .replace(/versionName(\s*=?\s*)"[^"]*"/, `versionName$1"${name}"`);
+  fs.writeFileSync(gradle, g);
+  console.log(`✓ גרסה ${name} (versionCode ${code})`);
+}
+
 const vars = path.join(root, 'android/variables.gradle');
 if (fs.existsSync(vars)) {
   const m = fs.readFileSync(vars, 'utf8').match(/targetSdkVersion\s*=\s*(\d+)/);

@@ -476,6 +476,36 @@ select{appearance:auto;}
 .qa button.primary{background:var(--btn);color:var(--btn-ink);}
 .hero-line.small{font-size:14px;line-height:1.45;margin-top:8px;}
 .sw{position:relative;flex:none;width:48px;height:28px;border-radius:14px;border:0;padding:0;background:var(--line);cursor:pointer;transition:background .2s}.sw::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}.sw[aria-checked="true"]{background:var(--btn)}.sw[aria-checked="true"]::after{transform:translateX(-20px)}[dir=ltr] .sw[aria-checked="true"]::after{transform:translateX(20px)}.rem-extra{margin-top:12px}.rem-times{display:grid;grid-template-columns:1fr 1fr;gap:10px}.rem-time{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}.rem-time input{max-width:160px}.row-btn{background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer}
+
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+.credit .grow{display:flex;flex-direction:column;gap:2px}
+.credit-name,.about-name{background:linear-gradient(100deg,var(--ink) 0%,var(--ink) 38%,#F7D84A 50%,var(--ink) 62%,var(--ink) 100%);background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 3.6s ease-in-out infinite}
+@keyframes shine{0%{background-position:100% 0}55%,100%{background-position:0 0}}
+.credit-line{display:block;margin:18px auto 0;background:none;border:0;color:var(--ink-3);font:inherit;font-size:13px;cursor:pointer;padding:8px}
+.about{text-align:center;padding:4px 0 8px}
+.about-dial{appearance:none;border:0;background:none;padding:0;width:200px;height:200px;margin:4px auto 0;display:block;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.about-dial:active .ab-dial{transform:scale(.96)}
+.ab-dial{width:100%;height:100%;transition:transform .15s}
+.ab-bg{fill:#18224F}
+.ab-seg{fill:none;stroke:#fff;stroke-opacity:.9;stroke-width:24;stroke-dasharray:80;stroke-dashoffset:80;animation:ab-draw .45s ease-out forwards;animation-delay:calc(var(--i) * 90ms + 200ms);transition:stroke .25s,stroke-opacity .25s}
+.ab-seg.lit{stroke:#F7D84A;stroke-opacity:1}
+@keyframes ab-draw{to{stroke-dashoffset:0}}
+.ab-needle{transform-origin:140px 140px;animation:ab-sweep 1.3s cubic-bezier(.3,1.35,.5,1) .25s both;transition:transform .45s cubic-bezier(.3,1.4,.5,1)}
+.ab-needle path,.ab-needle circle{fill:#fff}.ab-needle .ab-dot{fill:#18224F}
+@keyframes ab-sweep{from{transform:rotate(-220deg)}to{transform:rotate(0)}}
+.about-word{width:150px;margin:10px auto 0;color:var(--ink)}
+.about-word svg{width:100%;height:auto}
+.about-ver{margin-top:10px}
+.about-log{list-style:none;margin:12px auto 0;padding:0;max-width:340px;text-align:start}
+.about-log li{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;line-height:1.45;color:var(--ink-2)}
+.about-log b{flex:none;min-width:44px;color:var(--ink);font-variant-numeric:tabular-nums}
+.about-by{margin:22px 0 0;color:var(--ink-3);font-size:14px}
+.about-name{font-family:var(--font-display);font-size:36px;line-height:1.2;margin:2px 0 0}
+.about-studio{margin:2px 0 0;color:var(--ink-3);font-size:13px;letter-spacing:.04em}
+.about-hint{margin-top:18px}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+.confetti i{position:absolute;display:block}
+@media (prefers-reduced-motion: reduce){.ab-seg{animation:none;stroke-dashoffset:0}.ab-needle{animation:none}.credit-name,.about-name{animation:none;background:none;color:var(--ink)}}
 </style>
 </head>
 <body>
@@ -484,6 +514,7 @@ select{appearance:auto;}
     <h1 class="brand" aria-label="MyShot"><span class="lockup"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect class="mk-t" width="64" height="64" rx="18"/><g fill="none" stroke-width="6.6"><path d="M25.10 13.76A19.5 19.5 0 0 1 38.90 13.76" stroke="#F7D84A"/><path d="M41.96 15.24A19.5 19.5 0 0 1 50.56 26.02" stroke="#fff" stroke-opacity="0.95"/><path d="M51.32 29.33A19.5 19.5 0 0 1 48.25 42.78" stroke="#fff" stroke-opacity="0.95"/><path d="M46.13 45.44A19.5 19.5 0 0 1 33.70 51.43" stroke="#fff" stroke-opacity="0.95"/><path d="M30.30 51.43A19.5 19.5 0 0 1 17.87 45.44" stroke="#fff" stroke-opacity="0.95"/><path d="M15.75 42.78A19.5 19.5 0 0 1 12.68 29.33" stroke="#fff" stroke-opacity="0.32"/><path d="M13.44 26.02A19.5 19.5 0 0 1 22.04 15.24" stroke="#fff" stroke-opacity="0.32"/></g><path d="M30.3 32.5L32 11.6l1.7 20.9z" fill="#fff"/><circle cx="32" cy="32" r="4.6" fill="#fff"/><circle class="mk-t" cx="32" cy="32" r="1.7"/></svg><svg class="word" viewBox="0 6 153 49" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 40V14l11 16.5L25 14v26M34 22l9.6 17.6M52.5 22l-12 28"/><path d="M78.6 17.6C76.6 14.2 73.4 12.2 69.6 12.2c-5 0-8 3-8 7.2 0 4.8 4.2 6.2 8.4 7.2 4.6 1.1 9 2.8 9 7.4 0 4.2-3.6 6.6-8.8 6.6-4.4 0-7.6-2-9.6-5.4"/><path d="M89 11.5V40m0-10.5c0-4.7 3.6-7.5 8-7.5 4.6 0 8 2.8 8 7.8V40"/><path d="M120.56 22.34A9 9 0 0 1 125.44 22.34" stroke="#F7D84A"/><path d="M128.25 23.69A9 9 0 0 1 131.29 27.50M131.99 30.55A9 9 0 0 1 130.90 35.30M128.96 37.75A9 9 0 0 1 124.56 39.86M121.44 39.86A9 9 0 0 1 117.04 37.75M115.10 35.30A9 9 0 0 1 114.01 30.55M114.71 27.50A9 9 0 0 1 117.75 23.69"/><path d="M141 14v20.5c0 3.9 2 5.5 5.4 5.5h2.2m-12-17.8h12.8"/></svg></span></h1>
     <div class="top-side">
       <button class="icon-btn add-btn" data-act="quick" aria-label="תיעוד חדש"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="icon-btn theme-btn" id="theme-btn" data-act="theme-toggle" aria-label="מעבר למצב כהה"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg></button>
       <button class="icon-btn" data-act="settings" aria-label="הגדרות"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg></button>
     </div>
   </div>
@@ -727,6 +758,90 @@ const Native = (() => {
   };
   return { on, plugin };
 })();
+
+const APP_VERSION = '1.4.0';
+const CHANGELOG = [
+  ['1.4.0', 'מעבר מהיר בין מצב כהה לבהיר, קרדיט ומספר גרסה'],
+  ['1.3.0', 'מצלמה לארוחות, לתוויות ולקבלות, מסך תזכורות עם תזכורות משלכם, וגיבוי ל-Google Drive'],
+  ['1.2.0', 'Gemini מהיר יותר, עם ניסיון חוזר אוטומטי והודעות ברורות'],
+  ['1.1.0', 'בחירה בין Claude, ChatGPT ו-Gemini עם מפתח אישי'],
+  ['1.0.0', 'אפליקציית אנדרואיד, עם תזכורות והתראות'],
+];
+const ICO_MOON = '<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>';
+const ICO_SUN = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>';
+const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+function effectiveTheme() {
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t === 'light' || t === 'dark') return t;
+  try { return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; } catch (e) { return 'light'; }
+}
+function syncThemeBtn(animate) {
+  const b = document.getElementById('theme-btn'); if (!b) return;
+  const dark = effectiveTheme() === 'dark';
+  b.innerHTML = dark ? ICO_SUN : ICO_MOON;
+  b.setAttribute('aria-label', dark ? 'מעבר למצב בהיר' : 'מעבר למצב כהה');
+  const svg = b.querySelector('svg');
+  if (animate && svg && svg.animate && !reducedMotion()) svg.animate([{ transform: 'rotate(-120deg) scale(.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.3,1.4,.5,1)' });
+}
+function toggleTheme(btn) {
+  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  const go = () => { setTheme(next); syncThemeBtn(true); };
+  if (!document.startViewTransition || reducedMotion() || !btn) { go(); return; }
+  const r = btn.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+  const end = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  try {
+    const vt = document.startViewTransition(go);
+    vt.ready.then(() => document.documentElement.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${end}px at ${x}px ${y}px)`] }, { duration: 520, easing: 'cubic-bezier(.4,0,.2,1)', pseudoElement: '::view-transition-new(root)' })).catch(() => {});
+  } catch (e) { go(); }
+}
+const hap = style => { const H = Native.plugin('Haptics'); if (H && H.impact) { try { const p = H.impact({ style }); if (p && p.catch) p.catch(() => {}); } catch (e) {} } };
+const hapDone = () => { const H = Native.plugin('Haptics'); if (H && H.notification) { try { const p = H.notification({ type: 'SUCCESS' }); if (p && p.catch) p.catch(() => {}); } catch (e) {} } };
+function aboutDialSVG() {
+  const cx = 140, cy = 140, r = 96, span = 360 / 7, gap = 8;
+  let segs = '';
+  for (let k = 0; k < 7; k++) segs += `<path class="ab-seg" style="--i:${k}" d="${arc(cx, cy, r, k * span - span / 2 + gap / 2, k * span + span / 2 - gap / 2)}"/>`;
+  return `<svg viewBox="0 0 280 280" class="ab-dial" aria-hidden="true"><circle cx="140" cy="140" r="132" class="ab-bg"/>${segs}<g class="ab-needle"><path d="M133 146 L140 62 L147 146 Z"/><circle cx="140" cy="140" r="15"/><circle cx="140" cy="140" r="5.5" class="ab-dot"/></g></svg>`;
+}
+function openAbout() {
+  F = { kind: 'about', egg: 0 };
+  const body = `<div class="about">
+    <button class="about-dial" data-act="egg" aria-label="הטבעת של MyShot">${aboutDialSVG()}</button>
+    <div class="about-word">${LOGO_WORD}</div>
+    <button class="chip about-ver" data-act="about-ver" aria-expanded="false" aria-controls="about-log">גרסה ${APP_VERSION}</button>
+    <ul class="about-log" id="about-log" hidden>${CHANGELOG.map(([v, t]) => `<li><b>${v}</b><span>${esc(t)}</span></li>`).join('')}</ul>
+    <p class="about-by">פותח על ידי</p>
+    <p class="about-name">רן יעקבי</p>
+    <p class="about-studio">ItRan Studios</p>
+    <p class="tiny muted about-hint" id="about-hint">יש כאן הפתעה קטנה. נסו להקיש על הטבעת.</p>
+  </div>`;
+  Sheet.open('אודות', body);
+}
+function eggTap(btn) {
+  F.egg = (F.egg || 0) % 7 + 1;
+  const k = F.egg - 1, segs = btn.querySelectorAll('.ab-seg'), needle = btn.querySelector('.ab-needle');
+  if (k === 0) segs.forEach(x => x.classList.remove('lit'));
+  if (segs[k]) segs[k].classList.add('lit');
+  if (needle) { needle.style.animation = 'none'; needle.style.transform = `rotate(${k * 360 / 7}deg)`; }
+  const hint = document.getElementById('about-hint');
+  if (F.egg < 7) { hap('LIGHT'); if (hint) hint.textContent = `${F.egg} מתוך 7…`; return; }
+  hap('HEAVY'); hapDone(); confetti(btn);
+  if (hint) hint.textContent = 'שבוע מושלם! כל שבעת הימים מסומנים 🎉';
+}
+function confetti(origin) {
+  if (reducedMotion() || !document.body.animate) return;
+  const r = origin.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const colors = ['#F7D84A', '#18224F', '#5B7CFA', '#2BB673', '#FF6B6B', '#FFFFFF', '#F7D84A'];
+  const layer = document.createElement('div'); layer.className = 'confetti'; document.body.appendChild(layer);
+  for (let i = 0; i < 56; i++) {
+    const el = document.createElement('i'), w = 6 + Math.random() * 6, round = Math.random() < .3;
+    el.style.cssText = `left:${cx}px;top:${cy}px;width:${w}px;height:${round ? w : w * .45}px;background:${colors[i % colors.length]};border-radius:${round ? '50%' : '2px'};box-shadow:0 0 0 1px rgba(0,0,0,.06)`;
+    layer.appendChild(el);
+    const a = Math.random() * Math.PI * 2, d = 80 + Math.random() * 170, dx = Math.cos(a) * d, dy = Math.sin(a) * d - 70, spin = Math.random() * 900 - 450;
+    el.animate([{ transform: 'translate(-50%,-50%) rotate(0deg)', opacity: 1 }, { transform: `translate(${dx}px,${dy}px) rotate(${spin}deg)`, opacity: 1, offset: .65 }, { transform: `translate(${dx * 1.15}px,${dy + 170}px) rotate(${spin * 1.6}deg)`, opacity: 0 }], { duration: 1300 + Math.random() * 600, easing: 'cubic-bezier(.18,.7,.3,1)', fill: 'forwards' });
+  }
+  setTimeout(() => layer.remove(), 2200);
+}
+
 const REM_DEF = { dose: true, follow: true, followH: 0, eve: false, eveTime: '20:00', supps: true, water: false, water_: { from: '10:00', to: '20:00', every: 3 }, weigh: false, weighDay: 5, weighTime: '08:00', stock: true, backup: false, backupDay: 5, backupTime: '20:00', time2: '20:00', slots: { morning: '08:00', noon: '13:00', evening: '19:00', night: '22:00' }, custom: [] };
 function remCfg() { const r = (S.core.settings && S.core.settings.rem) || {}; return { ...REM_DEF, ...r, slots: { ...REM_DEF.slots, ...(r.slots || {}) }, water_: { ...REM_DEF.water_, ...(r.water_ || {}) }, custom: Array.isArray(r.custom) ? r.custom.map(c => ({ ...c, days: Array.isArray(c.days) ? c.days.slice() : [] })) : [] }; }
 function remSave(fn) { return mutate('core', c => { const keep = S.core.settings.rem; S.core.settings.rem = c.settings.rem; const r = remCfg(); S.core.settings.rem = keep; fn(r); c.settings.rem = r; }); }
@@ -1188,7 +1303,7 @@ async function nativeBoot() {
         AP.exitApp();
       });
       AP.addListener('appStateChange', st => {
-        if (st && st.isActive) { if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
+        if (st && st.isActive) { nativeBars(); syncThemeBtn(); if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
         else Sync.flushAll();
       });
     } catch (e) {}
@@ -2214,6 +2329,7 @@ function viewMore() {
   </div>
   <div class="group mt"><button class="row" data-act="more-go" data-k="guide" data-open="g-red"><span style="color:var(--alert);display:flex">${ICON.warn}</span><div class="grow"><div class="row-title" style="color:var(--alert)">מתי לפנות לרופא מיד</div><div class="row-sub">סימנים שלא מחכים איתם</div></div>${ICON.chev}</button></div>
   <div class="group mt"><button class="row" data-act="settings">${ICON.gear}<div class="grow"><div class="row-title">הגדרות וגיבוי</div><div class="row-sub">יום ההזרקה, יעדים, מראה וגיבוי הנתונים</div></div>${ICON.chev}</button></div>
+  <div class="group mt"><button class="row credit" data-act="about" aria-label="אודות MyShot, גרסה ${APP_VERSION}"><span class="lockup" style="width:34px;flex:none">${LOGO_MARK}</span><div class="grow"><div class="row-title">פותח על ידי <span class="credit-name">רן יעקבי</span></div><div class="row-sub">MyShot · גרסה ${APP_VERSION}</div></div>${ICON.chev}</button></div>
   <p class="disclaimer">המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי. בכל שאלה על המינון, על תרופות נוספות או על תופעה שמדאיגה אתכם — פנו לרופא או לרוקח. בחירום: מד״א 101.</p>`;
 }
 function openQuick() {
@@ -2622,6 +2738,7 @@ App.render = function () {
   $$('.tab').forEach(b => { if (b.dataset.tab === App.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   const tb = $('.tab[data-tab="shots"]');
   if (tb) { const tt = T(), sp = tb.querySelector('span'); if (sp.textContent !== tt.tab) { sp.textContent = tt.tab; tb.querySelector('svg').innerHTML = tt.pen ? '<path d="M18 2l4 4M17 7l3-3M19 9L8.7 19.3a2.4 2.4 0 0 1-3.4 0l-.6-.6a2.4 2.4 0 0 1 0-3.4L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/>' : '<path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7zM8.5 8.5l7 7"/>'; } }
+  syncThemeBtn();
   hydrateThumbs();
 };
 const thumbCache = new Map(), thumbLoading = new Set();
@@ -3024,7 +3141,7 @@ async function receiptDel() {
 /* ---------- settings & onboarding ---------- */
 function getTheme() { try { return localStorage.getItem('mj-theme') || 'auto'; } catch (e) { return 'auto'; } }
 function applyTheme(t = getTheme()) { const r = document.documentElement; if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme'); }
-function setTheme(t) { try { localStorage.setItem('mj-theme', t); } catch (e) {} applyTheme(t); if (Native.on) nativeBars(); }
+function setTheme(t) { try { localStorage.setItem('mj-theme', t); } catch (e) {} applyTheme(t); if (Native.on) nativeBars(); syncThemeBtn(); }
 
 const dayChips = sel => DAYS.map((d, i) => `<button class="chip" data-pick="day" data-val="${i}" aria-pressed="${String(sel) === String(i)}">${d}</button>`).join('');
 const doseChips = sel => DOSES_OF().map(d => `<button class="chip num" data-pick="dose" data-val="${d}" aria-pressed="${sel === d}">${fmtDose(d)}</button>`).join('');
@@ -3089,7 +3206,8 @@ function openSettings() {
     <h3 class="h-sub" style="margin-top:26px">גיבוי ונתונים</h3>
     <p class="small muted">${storage}</p>
     ${Native.on ? `<div class="chips" style="margin-top:12px"><button class="chip" data-act="backup-drive">${icoCloud()} גיבוי ל-Google Drive</button></div><p class="tiny muted" style="margin-top:8px">נפתח חלון השיתוף של אנדרואיד: בוחרים Drive ואת התיקייה. כדי לשחזר, לוחצים ״שחזור מגיבוי״ ובוחרים את הקובץ מתוך Drive. גיבוי אחרון: ${lastBackupText()}.</p>` : ''}<div class="chips" style="margin-top:12px">${App.downloads ? `<button class="chip" data-act="export">${Native.on ? 'ייצוא לקובץ' : 'ייצוא גיבוי'}</button>` : ''}<label class="chip file-btn">${Native.on ? 'שחזור מגיבוי' : 'ייבוא גיבוי'}<input type="file" accept="application/json,.json" data-file="import"></label><button class="chip out" style="color:var(--alert)" data-act="wipe">מחיקת כל הנתונים</button></div>
-    <p class="disclaimer" style="margin-top:20px">המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי.</p>`;
+    <p class="disclaimer" style="margin-top:20px">המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי.</p>
+    <button class="credit-line" data-act="about">MyShot · גרסה ${APP_VERSION} · פותח על ידי רן יעקבי</button>`;
   Sheet.open('הגדרות', body, '<button class="btn" data-act="set-save">שמירת ההגדרות</button>', sh => {
     F.onChange = g => { if (g === 'theme') setTheme(F.theme); if (g === 'aiProv') { const b = $('#f-aiblock', sh); if (b) b.innerHTML = aiBlockHTML(); } medFormChange(sh, g, false); };
   });
@@ -3287,7 +3405,7 @@ async function doExport() {
   for (const r of S.receipts.items) if (r.img) { const src = imgCache.get(r.img) || ((await Backend.getImg(r.img)) || {}).src; if (typeof src === 'string') images[r.img] = src; }
   const photos = {};
   for (const x of S.photos.items) { const src = await loadPhoto(x.id); const th = thumbCache.get(x.id) || ((await Backend.getBlob('pt-' + x.id)) || {}).src; if (src) photos[x.id] = { src, thumb: typeof th === 'string' ? th : '' }; }
-  const data = JSON.stringify({ app: 'mounjaro-journal', v: 2, exported: new Date().toISOString(), docs: clone(S), images, photos });
+  const data = JSON.stringify({ app: 'mounjaro-journal', v: 2, appVersion: APP_VERSION, exported: new Date().toISOString(), docs: clone(S), images, photos });
   await saveFile(`myshot-backup-${todayStr()}.json`, data, 'הגיבוי נשמר');
 }
 async function doImport(file) {
@@ -3881,6 +3999,10 @@ document.addEventListener('click', e => {
     case 'akey-del': { const c = AIKeys.read(); delete c.keys[F.aiProv]; AIKeys.write(c); AIKeys.setup(); const b = $('#f-aiblock'); if (b) b.innerHTML = aiBlockHTML(); toast('המפתח הוסר'); break; }
     case 'ai-test': aiTest(); break;
     case 'rem-page': openRemPage(); break;
+    case 'theme-toggle': toggleTheme(a); break;
+    case 'about': openAbout(); break;
+    case 'about-ver': { const log = document.getElementById('about-log'); if (log) { log.hidden = !log.hidden; a.setAttribute('aria-expanded', String(!log.hidden)); } break; }
+    case 'egg': eggTap(a); break;
     case 'rem-tog': { const k = d.k; remSave(r => { r[k] = !r[k]; }); break; }
     case 'rem-set': { const k = d.k, v = +d.v; remSave(r => { if (k.includes('.')) { const [a, b] = k.split('.'); r[a][b] = v; } else r[k] = v; }); break; }
     case 'rem-test': Reminders.test(); break;
@@ -3959,6 +4081,8 @@ async function boot() {
   window.addEventListener('pagehide', () => Sync.flushAll());
   setInterval(() => { if (App.ready && !Sheet.isOpen()) App.render(); }, 5 * 60 * 1000);
   initOptional();
+  syncThemeBtn();
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => syncThemeBtn(true)); } catch (e) {}
   AIKeys.setup();
   nativeBoot();
   await Backend.init();

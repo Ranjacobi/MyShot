@@ -24,8 +24,8 @@ fi
 npm install
 if [ ! -d android ]; then
   npx cap add android
-  node scripts/patch-android.mjs
 fi
+node scripts/patch-android.mjs
 npx capacitor-assets generate --android
 npx cap sync android
 (cd android && chmod +x gradlew && ./gradlew assembleDebug)

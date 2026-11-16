@@ -18,6 +18,7 @@ Personal tracker for weight-loss medications: doses, reminders, nutrition, suppl
 - **Tracking.** Side effects by day of the injection cycle, weight and BMI, progress photos with side-by-side comparison, and 7- and 30-day summaries.
 - **Receipts.** Photograph a receipt and, with an AI key, the date, amount, vendor and category fill in automatically.
 - **For the doctor.** A PDF report, a text summary and a list of questions for the next visit.
+- **Light and dark.** Follows the phone's setting, or switch in one tap with the sun/moon button in the header.
 - **Private.** All data stays on the phone. Back up to Google Drive in one tap and restore from it later. Backups and reports leave only through the Android share sheet.
 
 ## Get the APK
@@ -103,6 +104,12 @@ Google Play needs an AAB signed with your own upload key, and new apps must targ
 3. From the next run, **Artifacts** also has **MyShot-release** with a signed APK and AAB.
 
 Never commit the release keystore; `.gitignore` already excludes `*.jks`. The package ID is `com.itranstudios.myshot`. To change it, edit `capacitor.config.json` before the first Play upload, because it can't change afterwards.
+
+## Version
+
+The version lives in one place: `APP_VERSION` in `www/index.html`. On every build, `scripts/patch-android.mjs` copies it to Android as `versionName`, with `versionCode` = major × 10000 + minor × 100 + patch (1.4.0 → 10400), so each release is higher than the last. Each Release is also titled with it.
+
+To release a new version, bump `APP_VERSION`, add a line at the top of `CHANGELOG` in the same file (it shows in the app's About screen), and push.
 
 ## Project structure
 
