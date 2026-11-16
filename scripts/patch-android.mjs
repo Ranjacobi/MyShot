@@ -17,8 +17,12 @@ const perms = [
 for (const p of perms) {
   if (!xml.includes(`"${p}"`)) xml = xml.replace('</manifest>', `    <uses-permission android:name="${p}" />\n</manifest>`);
 }
+// Android 11+: without this, the camera app can't be found and photo buttons open the gallery instead.
+if (!xml.includes('android.media.action.IMAGE_CAPTURE')) {
+  xml = xml.replace('</manifest>', '    <queries>\n        <intent>\n            <action android:name="android.media.action.IMAGE_CAPTURE" />\n        </intent>\n    </queries>\n</manifest>');
+}
 fs.writeFileSync(manifest, xml);
-console.log('✓ הרשאות התראות נוספו ל-AndroidManifest.xml');
+console.log('✓ הרשאות התראות ואפשרות המצלמה נוספו ל-AndroidManifest.xml');
 
 for (const d of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
   const src = path.join(root, 'resources/android', `drawable-${d}`, 'ic_stat_myshot.png');

@@ -475,6 +475,7 @@ select{appearance:auto;}
 .qa button .ico{width:26px;height:26px;}
 .qa button.primary{background:var(--btn);color:var(--btn-ink);}
 .hero-line.small{font-size:14px;line-height:1.45;margin-top:8px;}
+.sw{position:relative;flex:none;width:48px;height:28px;border-radius:14px;border:0;padding:0;background:var(--line);cursor:pointer;transition:background .2s}.sw::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}.sw[aria-checked="true"]{background:var(--btn)}.sw[aria-checked="true"]::after{transform:translateX(-20px)}[dir=ltr] .sw[aria-checked="true"]::after{transform:translateX(20px)}.rem-extra{margin-top:12px}.rem-times{display:grid;grid-template-columns:1fr 1fr;gap:10px}.rem-time{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}.rem-time input{max-width:160px}.row-btn{background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer}
 </style>
 </head>
 <body>
@@ -726,8 +727,9 @@ const Native = (() => {
   };
   return { on, plugin };
 })();
-const REM_DEF = { dose: true, follow: true, eve: false, supps: true, water: false, weigh: false, weighDay: 5, stock: true, time2: '20:00', slots: { morning: '08:00', noon: '13:00', evening: '19:00', night: '22:00' } };
-function remCfg() { const r = (S.core.settings && S.core.settings.rem) || {}; return { ...REM_DEF, ...r, slots: { ...REM_DEF.slots, ...(r.slots || {}) } }; }
+const REM_DEF = { dose: true, follow: true, followH: 0, eve: false, eveTime: '20:00', supps: true, water: false, water_: { from: '10:00', to: '20:00', every: 3 }, weigh: false, weighDay: 5, weighTime: '08:00', stock: true, backup: false, backupDay: 5, backupTime: '20:00', time2: '20:00', slots: { morning: '08:00', noon: '13:00', evening: '19:00', night: '22:00' }, custom: [] };
+function remCfg() { const r = (S.core.settings && S.core.settings.rem) || {}; return { ...REM_DEF, ...r, slots: { ...REM_DEF.slots, ...(r.slots || {}) }, water_: { ...REM_DEF.water_, ...(r.water_ || {}) }, custom: Array.isArray(r.custom) ? r.custom.map(c => ({ ...c, days: Array.isArray(c.days) ? c.days.slice() : [] })) : [] }; }
+function remSave(fn) { return mutate('core', c => { const keep = S.core.settings.rem; S.core.settings.rem = c.settings.rem; const r = remCfg(); S.core.settings.rem = keep; fn(r); c.settings.rem = r; }); }
 const recentBackup = () => { try { return Date.now() - (+localStorage.getItem('mj-lastbackup') || 0) < 30 * DAY; } catch (e) { return false; } };
 
 const Reminders = {
@@ -740,7 +742,7 @@ const Reminders = {
       await LN.createChannel({ id: 'supps', name: 'תוספים', description: 'תזכורות לתוספים', importance: 4, visibility: 1, vibration: true });
       await LN.createChannel({ id: 'general', name: 'כללי', description: 'מים, שקילה ומלאי', importance: 3, visibility: 1 });
     } catch (e) {}
-    try { await LN.registerActionTypes({ types: [{ id: 'DOSE', actions: [{ id: 'taken', title: 'תיעדתי' }, { id: 'snooze', title: 'בעוד שעה' }] }, { id: 'SUPPS', actions: [{ id: 'taken', title: 'לקחתי הכול' }] }] }); } catch (e) {}
+    try { await LN.registerActionTypes({ types: [{ id: 'DOSE', actions: [{ id: 'taken', title: 'תיעדתי' }, { id: 'snooze', title: 'בעוד שעה' }] }, { id: 'SUPPS', actions: [{ id: 'taken', title: 'לקחתי הכול' }] }, { id: 'BACKUP', actions: [{ id: 'backup', title: 'גיבוי עכשיו' }] }] }); } catch (e) {}
     try { await LN.addListener('localNotificationActionPerformed', ev => { this.queue.push(ev); this.flush(); }); } catch (e) {}
     await this.refreshPerm();
   },
@@ -777,6 +779,11 @@ const Reminders = {
   snoozes() {
     try { const now = Date.now(), a = JSON.parse(localStorage.getItem('mj-snz') || '[]').filter(z => z && z.at > now); localStorage.setItem('mj-snz', JSON.stringify(a)); return a; } catch (e) { return []; }
   },
+  test() {
+    if (this.perm !== 'granted') { toast('צריך להפעיל התראות קודם.', 'alert'); return; }
+    try { const a = this.snoozes().filter(z => z.id !== 9999); a.push({ id: 9999, at: Date.now() + 5000, title: 'התראת ניסיון', body: 'כך ייראו התזכורות של MyShot.', extra: { kind: 'test' }, action: '' }); localStorage.setItem('mj-snz', JSON.stringify(a.slice(-10))); } catch (e) {}
+    this.soon(0); toast('ההתראה תגיע בעוד כמה שניות');
+  },
   snooze(n, min) {
     try { const a = this.snoozes(); a.push({ id: 8000 + (Math.floor(Date.now() / 60000) % 900), at: Date.now() + min * 60000, title: n.title || 'תזכורת', body: n.body || '', extra: n.extra || { kind: 'dose' } }); localStorage.setItem('mj-snz', JSON.stringify(a.slice(-10))); } catch (e) {}
     this.soon(0);
@@ -800,8 +807,8 @@ const Reminders = {
           for (let k = 0; k < 8; k++) {
             const d = addDays(sc.due, 7 * k);
             add(1000 + k, d, `היום יום ה${t.dose}`, what + (k === 0 ? site : ''), { kind: 'dose' }, 'meds', 'DOSE');
-            if (r.follow) add(2000 + k, new Date(+d + 4 * HOUR), `עוד לא תיעדתם את ה${t.dose}`, `${what}. כבר ${verb}? סמנו ״תיעדתי״.`, { kind: 'dose' }, 'meds', 'DOSE');
-            if (r.eve) add(3000 + k, at(addDays(d, -1), '20:00'), `מחר יום ה${t.dose}`, `${what}. כדאי לוודא שיש ${t.pen ? 'עט' : 'מנה'} במלאי.`, { kind: 'eve' }, 'general');
+            if (r.follow) add(2000 + k, new Date(+d + (r.followH || 4) * HOUR), `עוד לא תיעדתם את ה${t.dose}`, `${what}. כבר ${verb}? סמנו ״תיעדתי״.`, { kind: 'dose' }, 'meds', 'DOSE');
+            if (r.eve) add(3000 + k, at(addDays(d, -1), r.eveTime), `מחר יום ה${t.dose}`, `${what}. כדאי לוודא שיש ${t.pen ? 'עט' : 'מנה'} במלאי.`, { kind: 'eve' }, 'general');
           }
           if (sc.state === 'late' && sc.deadline) {
             let d = at(now, st.time); if (d <= now) d = addDays(d, 1);
@@ -818,7 +825,7 @@ const Reminders = {
             if (j < taken) return;
             const when = at(day, tm);
             add(1000 + i * 4 + j, when, m.freq === 'meals' ? `${m.name} עם הארוחה` : `הגיע הזמן ל${m.name}`, m.freq === 'meals' ? 'כמוסה עם ארוחה עיקרית שיש בה שומן.' : what + (m.how ? ` · ${m.how}` : ''), { kind: 'dose' }, 'meds', 'DOSE');
-            if (r.follow && m.freq !== 'meals' && j === times.length - 1) add(2000 + i, new Date(+when + (m.fast ? 1 : 3) * HOUR), `עוד לא תיעדתם את ה${t.dose} של היום`, m.fast ? 'כבר לקחתם? אם בינתיים אכלתם או שתיתם משהו חוץ ממים — מדלגים היום וממשיכים מחר.' : `כבר ${verb}? סמנו ״תיעדתי״.`, { kind: 'dose' }, 'meds', 'DOSE');
+            if (r.follow && m.freq !== 'meals' && j === times.length - 1) add(2000 + i, new Date(+when + (m.fast ? 1 : (r.followH || 3)) * HOUR), `עוד לא תיעדתם את ה${t.dose} של היום`, m.fast ? 'כבר לקחתם? אם בינתיים אכלתם או שתיתם משהו חוץ ממים — מדלגים היום וממשיכים מחר.' : `כבר ${verb}? סמנו ״תיעדתי״.`, { kind: 'dose' }, 'meds', 'DOSE');
           });
         }
       }
@@ -838,11 +845,11 @@ const Reminders = {
       for (let i = 0; i < 7; i++) {
         const day = addDays(startOfDay(now), i), ds = toDateStr(day), w = +((S.daily.days[ds] || {}).w) || 0;
         if (w >= goal) continue;
-        ['10:30', '13:30', '16:30', '19:30'].forEach((tm, j) => add(5000 + i * 4 + j, at(day, tm), 'כוס מים?', `היעד היומי: ${goal} כוסות.`, { kind: 'water' }, 'general'));
+        waterTimes(r).forEach((tm, j) => add(5000 + i * 8 + j, at(day, tm), 'כוס מים?', `היעד היומי: ${goal} כוסות.`, { kind: 'water' }, 'general'));
       }
     }
     if (r.weigh) {
-      let d = nextOccurrence(startOfDay(now), r.weighDay, '08:00'); if (d <= now) d = addDays(d, 7);
+      let d = nextOccurrence(startOfDay(now), r.weighDay, r.weighTime); if (d <= now) d = addDays(d, 7);
       for (let k = 0; k < 4; k++) add(6000 + k, addDays(d, 7 * k), 'שקילה שבועית', 'בבוקר, לפני שאוכלים — כך המדידות עקביות.', { kind: 'weigh' }, 'general');
     }
     if (r.stock) {
@@ -850,7 +857,15 @@ const Reminders = {
       if (low) add(7000, at(addDays(startOfDay(now), 1), '10:00'), 'המלאי עומד להיגמר', low, { kind: 'stock' }, 'general');
       if (pen.discard && pen.open) add(7001, at(addDays(pen.discard, -2), '10:00'), 'העט שבשימוש — עוד יומיים', `לפי ההוראות זורקים אותו ב${fmtDay(pen.discard)}.`, { kind: 'stock' }, 'general');
     }
-    for (const z of this.snoozes()) add(z.id, new Date(z.at), z.title, z.body, z.extra, 'meds', 'DOSE');
+    if (r.backup) {
+      let d = nextOccurrence(startOfDay(now), r.backupDay, r.backupTime); if (d <= now) d = addDays(d, 7);
+      for (let k = 0; k < 4; k++) add(6500 + k, addDays(d, 7 * k), 'זמן לגיבוי', 'שמירת גיבוי של MyShot ב-Google Drive', { kind: 'backup' }, 'general', 'BACKUP');
+    }
+    r.custom.forEach((c, ci) => {
+      if (!c.on || ci >= 80) return;
+      customOccurrences(c, now, at).slice(0, 10).forEach((w, k) => add(9000 + ci * 10 + k, w, c.title, c.note || 'תזכורת שלך', { kind: 'custom', id: c.id }, 'general'));
+    });
+    for (const z of this.snoozes()) add(z.id, new Date(z.at), z.title, z.body, z.extra, z.extra && z.extra.kind === 'test' ? 'general' : 'meds', z.action === undefined ? 'DOSE' : z.action);
     return out;
   },
   flush() { if (!App.ready) return; while (this.queue.length) { try { this.handle(this.queue.shift()); } catch (e) { console.warn(e); } } },
@@ -866,6 +881,8 @@ const Reminders = {
       App.suppDay = x.date && x.date <= todayStr() ? x.date : todayStr(); setTab('supps'); return;
     }
     if (x.kind === 'weigh') { setTab('body'); setTimeout(() => openWeightForm(), 120); return; }
+    if (x.kind === 'backup') { backupToDrive(); return; }
+    if (x.kind === 'custom' || x.kind === 'test') { openRemPage(); return; }
     if (x.kind === 'stock') { setTab('shots'); return; }
     setTab('home', true);
   },
@@ -899,10 +916,11 @@ const NativeFiles = {
     const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
     const w = await FS.writeFile({ path: filename, data: b64, directory: 'CACHE' });
     const cancelled = e => /cancel/i.test(String(e && (e.message || e.errorMessage || e)));
-    try { await Sh.share({ title: filename, files: [w.uri], dialogTitle: 'שמירה או שליחה' }); }
+    const dlg = App.saveTitle || 'שמירה או שליחה';
+    try { await Sh.share({ title: filename, files: [w.uri], dialogTitle: dlg }); }
     catch (e) {
       if (cancelled(e)) return { cancelled: true };
-      try { await Sh.share({ title: filename, url: w.uri, dialogTitle: 'שמירה או שליחה' }); } catch (e2) { if (cancelled(e2)) return { cancelled: true }; throw e2; }
+      try { await Sh.share({ title: filename, url: w.uri, dialogTitle: dlg }); } catch (e2) { if (cancelled(e2)) return { cancelled: true }; throw e2; }
     }
     if (/\.json$/.test(filename)) { try { localStorage.setItem('mj-lastbackup', String(Date.now())); } catch (e) {} }
     return { saved: true };
@@ -1006,6 +1024,107 @@ function aiClient(provider, key, modelOverride) {
   fn.provider = provider;
   return fn;
 }
+
+const svgOpen = () => (String(ICON.gear).match(/^<svg[^>]*>/) || ['<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'])[0];
+const icoBell = () => svgOpen() + '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+const icoCloud = () => svgOpen() + '<path d="M12 13v8"/><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="m8 17 4-4 4 4"/></svg>';
+const hm2min = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+const min2hm = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+function waterTimes(r) {
+  const out = [], a = hm2min(r.water_.from), b = hm2min(r.water_.to), step = Math.max(1, +r.water_.every || 3) * 60;
+  for (let x = a; x <= b && out.length < 8; x += step) out.push(min2hm(x));
+  return out;
+}
+function customOccurrences(c, now, at) {
+  const occ = [], d0 = startOfDay(now);
+  if (c.rep === 'once') { const d = parseDT(c.date); if (d) occ.push(at(d, c.time)); }
+  else if (c.rep === 'daily') for (let i = 0; i < 12; i++) occ.push(at(addDays(d0, i), c.time));
+  else if (c.rep === 'weekly') for (let i = 0; i < 35 && occ.length < 12; i++) { const d = addDays(d0, i); if ((c.days || []).includes(d.getDay())) occ.push(at(d, c.time)); }
+  else if (c.rep === 'monthly') {
+    const start = parseDT(c.date); if (!start) return occ;
+    for (let k = 0; k < 3; k++) { const d = new Date(now.getFullYear(), now.getMonth() + k, 1), last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(start.getDate(), last)); if (d >= startOfDay(start)) occ.push(at(d, c.time)); }
+  }
+  return occ.filter(w => w > now);
+}
+function customSummary(c) {
+  if (c.rep === 'once') { const d = parseDT(c.date); return `פעם אחת: ${d ? fmtDay(d) : ''} בשעה ${c.time}`; }
+  if (c.rep === 'weekly') return `בימי ${(c.days || []).map(i => DAYS_SHORT[i]).join(', ')} בשעה ${c.time}`;
+  if (c.rep === 'monthly') { const d = parseDT(c.date); return `כל חודש, ב-${d ? d.getDate() : ''} לחודש בשעה ${c.time}`; }
+  return `כל יום בשעה ${c.time}`;
+}
+function openRemPage() { if (Sheet.isOpen()) Sheet.close(); App.tab = 'more'; App.more = 'reminders'; App.render(); window.scrollTo(0, 0); }
+function lastBackupText() { try { const t = +localStorage.getItem('mj-lastbackup'); return t ? `${fmtDay(new Date(t))}, ${fmtT(new Date(t))}` : 'עוד לא'; } catch (e) { return 'עוד לא'; } }
+async function backupToDrive() { App.saveTitle = 'שמירה ב-Google Drive'; try { await doExport(); } finally { App.saveTitle = null; } if (App.ready && !Sheet.isOpen()) App.render(); }
+function remActiveCount() { const r = remCfg(); return ['dose', 'follow', 'eve', 'supps', 'water', 'weigh', 'stock', 'backup'].filter(k => r[k] && (k !== 'eve' || curMed().freq === 'weekly')).length + r.custom.filter(c => c.on).length; }
+function remindersBody() {
+  const r = remCfg(), m = curMed(), t = T(), st = S.core.settings, weekly = m.freq === 'weekly';
+  let h = '';
+  if (Reminders.perm !== 'granted') h += '<div class="note warn" style="margin-top:12px">ההתראות כבויות, ולכן התזכורות לא יגיעו.<div style="margin-top:8px"><button class="chip" data-act="rem-ask">הפעלת התראות</button></div></div>';
+  else if (Reminders.exact && Reminders.exact !== 'granted') h += '<div class="note info" style="margin-top:12px">אנדרואיד עלול לעכב תזכורות בכמה דקות. כדי שיגיעו בדיוק בשעה:<div style="margin-top:8px"><button class="chip" data-act="rem-exact">התראות בשעה מדויקת</button></div></div>';
+  const sw = (k, label) => `<button class="sw" role="switch" aria-checked="${!!r[k]}" aria-label="${label}" data-act="rem-tog" data-k="${k}"></button>`;
+  const timeIn = (attr, val, label) => `<label class="rem-time"><span>${label}</span><input type="time" ${attr} value="${esc(val)}"></label>`;
+  const chipsSet = (k, opts, cur) => `<div class="chips">${opts.map(([v, l]) => `<button class="chip" data-act="rem-set" data-k="${k}" data-v="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
+  const dayChips = (k, cur) => chipsSet(k, DAYS.map((n, i) => [i, DAYS_SHORT[i]]), cur);
+  const row = (k, title, sub, extra) => `<div class="row col"><div class="rowline"><div class="grow"><div class="row-title">${title}</div><div class="row-sub">${sub}</div></div>${sw(k, title)}</div>${r[k] && extra ? `<div class="rem-extra">${extra}</div>` : ''}</div>`;
+  h += '<h2 class="h-section">תזכורות קבועות</h2><div class="group">';
+  h += row('dose', weekly ? `יום ה${t.dose}` : `${t.dose} יומית`, weekly ? (hasDay() ? `כל יום ${DAYS[st.day]}` : 'לפי המנה האחרונה') : esc(m.name),
+    timeIn('data-remset="time"', st.time || '09:00', 'שעה') + ((m.timesPerDay || 1) >= 2 && m.freq !== 'meals' ? timeIn('data-rem="time2"', r.time2, 'מנה שנייה') : ''));
+  h += row('follow', 'אם לא תועד', 'רק אם עוד לא סימנתם', m.fast ? '<p class="tiny muted" style="margin:0">בכדור על קיבה ריקה התזכורת מגיעה אחרי שעה, כי אחר כך כבר מדלגים.</p>' : `<p class="tiny muted" style="margin:0 0 8px">כמה שעות אחרי המועד</p>${chipsSet('followH', [[0, 'אוטומטי'], [1, 'שעה'], [2, 'שעתיים'], [3, '3'], [4, '4'], [6, '6']], r.followH || 0)}`);
+  if (weekly) h += row('eve', 'ערב לפני', `לוודא שיש ${t.pen ? 'עט' : 'מנה'} במלאי`, timeIn('data-rem="eveTime"', r.eveTime, 'שעה'));
+  h += row('supps', 'תוספים', 'לפי השעות של כל ארוחה ביום', `<div class="rem-times">${SLOT_ORDER.map(sl => timeIn(`data-rem="slots.${sl}"`, r.slots[sl], SLOTS[sl])).join('')}</div>`);
+  h += row('water', 'מים', `מתוך יעד של ${st.water || 8} כוסות`, `<div class="rem-times">${timeIn('data-rem="water_.from"', r.water_.from, 'מ-')}${timeIn('data-rem="water_.to"', r.water_.to, 'עד')}</div><p class="tiny muted" style="margin:8px 0">כל כמה שעות</p>${chipsSet('water_.every', [[1, 'שעה'], [2, 'שעתיים'], [3, '3'], [4, '4']], r.water_.every)}`);
+  h += row('weigh', 'שקילה שבועית', `ביום ${DAYS[r.weighDay]}`, dayChips('weighDay', r.weighDay) + `<div style="margin-top:10px">${timeIn('data-rem="weighTime"', r.weighTime, 'שעה')}</div>`);
+  h += row('stock', 'מלאי', 'כשהמלאי נמוך, או כשעט עומד לפוג', '');
+  h += row('backup', 'גיבוי שבועי', `ביום ${DAYS[r.backupDay]}, עם כפתור ״גיבוי עכשיו״`, dayChips('backupDay', r.backupDay) + `<div style="margin-top:10px">${timeIn('data-rem="backupTime"', r.backupTime, 'שעה')}</div>`);
+  h += '</div>';
+  h += '<h2 class="h-section">תזכורות שלי</h2><div class="group">';
+  if (!r.custom.length) h += '<div class="empty">למשל בדיקת דם, תור לרופא או חידוש מרשם.</div>';
+  for (const c of r.custom) h += `<div class="row"><button class="grow row-btn" data-act="rem-cedit" data-id="${esc(c.id)}" style="text-align:start"><div class="row-title">${esc(c.title)}</div><div class="row-sub">${customSummary(c)}</div></button><button class="sw" role="switch" aria-checked="${!!c.on}" aria-label="${esc(c.title)}" data-act="rem-ctog" data-id="${esc(c.id)}"></button></div>`;
+  h += `<button class="row add" data-act="rem-cnew">${ICON.plus}<span class="grow">תזכורת חדשה</span>${ICON.chev}</button></div>`;
+  const next = Reminders.build().sort((a, b) => a.schedule.at - b.schedule.at).slice(0, 8);
+  h += '<h2 class="h-section">בקרוב</h2><div class="group">';
+  if (!next.length) h += '<div class="empty">אין תזכורות מתוכננות.</div>';
+  for (const n of next) h += `<div class="row"><div class="grow"><div class="row-title">${esc(n.title)}</div><div class="row-sub">${fmtDay(n.schedule.at)}, ${fmtT(n.schedule.at)}</div></div></div>`;
+  h += '</div><div class="chips mt"><button class="chip" data-act="rem-test">שליחת התראת ניסיון</button></div>';
+  return h;
+}
+function customWhenHTML() {
+  const time = F.tTime || '09:00', date = F.tDate || todayStr();
+  let h = `<div class="two"><label class="field"><span class="fl">שעה</span><input type="time" id="f-rc-time" value="${esc(time)}"></label>`;
+  if (F.rep === 'once' || F.rep === 'monthly') h += `<label class="field"><span class="fl">${F.rep === 'once' ? 'תאריך' : 'מתאריך (אותו יום בכל חודש)'}</span><input type="date" id="f-rc-date" value="${esc(date)}"></label>`;
+  h += '</div>';
+  if (F.rep === 'weekly') h += `<div class="field"><span class="fl">באילו ימים</span><div class="chips">${DAYS.map((n, i) => `<button class="chip" data-act="rc-day" data-v="${i}" aria-pressed="${F.days.includes(i)}">${n}</button>`).join('')}</div></div>`;
+  return h;
+}
+function openCustomRem(id) {
+  const c = id ? remCfg().custom.find(x => x.id === id) : null; if (id && !c) return;
+  F = { kind: 'remc', id: c ? c.id : null, rep: c ? c.rep : 'daily', days: c ? (c.days || []).slice() : [new Date().getDay()], tTime: c ? c.time : '09:00', tDate: c && c.date ? c.date : todayStr(), num: [] };
+  const body = `
+    <label class="field"><span class="fl">מה להזכיר</span><input type="text" id="f-rc-title" maxlength="60" value="${esc(c ? c.title : '')}" placeholder="למשל: בדיקת דם, תור לרופא"></label>
+    <label class="field"><span class="fl">הערה (לא חובה)</span><input type="text" id="f-rc-note" maxlength="120" value="${esc(c ? c.note || '' : '')}"></label>
+    <div class="field"><span class="fl">מתי</span><div class="chips" role="group" aria-label="חזרה">${[['once', 'פעם אחת'], ['daily', 'כל יום'], ['weekly', 'בימים מסוימים'], ['monthly', 'כל חודש']].map(([k, l]) => `<button class="chip" data-pick="rep" data-val="${k}" aria-pressed="${F.rep === k}">${l}</button>`).join('')}</div></div>
+    <div id="f-rc-when">${customWhenHTML()}</div>`;
+  Sheet.open(c ? 'עריכת תזכורת' : 'תזכורת חדשה', body, `${c ? '<button class="btn danger" data-act="rem-cdel">מחיקה</button>' : ''}<button class="btn" data-act="rem-csave">שמירה</button>`, sh => {
+    F.onChange = g => { if (g !== 'rep') return; const tt = $('#f-rc-time', sh), dd = $('#f-rc-date', sh); if (tt) F.tTime = tt.value; if (dd) F.tDate = dd.value; $('#f-rc-when', sh).innerHTML = customWhenHTML(); };
+  });
+}
+function customRemSave() {
+  const sh = $('#sheet'), title = $('#f-rc-title', sh).value.trim().slice(0, 60), time = ($('#f-rc-time', sh) || {}).value || '', date = ($('#f-rc-date', sh) || {}).value || '';
+  if (!title) { toast('כתבו מה להזכיר.', 'alert'); return; }
+  if (!/^\d{2}:\d{2}$/.test(time)) { toast('בחרו שעה.', 'alert'); return; }
+  if ((F.rep === 'once' || F.rep === 'monthly') && !/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('בחרו תאריך.', 'alert'); return; }
+  if (F.rep === 'weekly' && !F.days.length) { toast('בחרו לפחות יום אחד.', 'alert'); return; }
+  if (F.rep === 'once' && parseDT(`${date}T${time}`) <= new Date()) { toast('המועד שבחרתם כבר עבר.', 'alert'); return; }
+  const rec = { id: F.id || uid(), title, note: $('#f-rc-note', sh).value.trim().slice(0, 120), time, rep: F.rep, days: F.rep === 'weekly' ? F.days.slice().sort() : [], date: F.rep === 'once' || F.rep === 'monthly' ? date : null, on: true };
+  if (!remSave(r => { const i = r.custom.findIndex(x => x.id === rec.id); if (i >= 0) { rec.on = r.custom[i].on; r.custom[i] = rec; } else r.custom.push(rec); r.custom = r.custom.slice(0, 40); })) return;
+  Sheet.close(); toast('התזכורת נשמרה');
+}
+document.addEventListener('change', e => {
+  const t = e.target; if (!t || !t.dataset || !/^\d{2}:\d{2}$/.test(t.value || '')) return;
+  if (t.dataset.rem) { const k = t.dataset.rem, v = t.value; remSave(r => { if (k.includes('.')) { const [a, b] = k.split('.'); r[a][b] = v; } else r[k] = v; }); }
+  else if (t.dataset.remset === 'time') { const v = t.value; mutate('core', c => { c.settings.time = v; }); }
+});
+
 function remToF() { const r = remCfg(); return { rem_dose: r.dose, rem_follow: r.follow, rem_eve: r.eve, rem_supps: r.supps, rem_water: r.water, rem_weigh: r.weigh, rem_stock: r.stock, rem_weighDay: r.weighDay, num: ['dose', 'rem_weighDay'] }; }
 function remSettingsHTML() {
   const r = remCfg(), m = curMed(), t = T();
@@ -2085,10 +2204,12 @@ function viewMore() {
   if (App.more === 'receipts') return banners() + subHead('קבלות') + receiptsBody();
   if (App.more === 'guide') return banners() + subHead('מדריך') + guideBody();
   if (App.more === 'doctor') return banners() + subHead('לרופא') + doctorBody();
+  if (App.more === 'reminders') return banners() + subHead('תזכורות') + remindersBody();
   const rs = receiptStats(), qOpen = S.core.questions.filter(q => !q.done).length;
   return banners() + pageTitle('עוד') + `<div class="group" style="margin-top:14px">
     <button class="row" data-act="more-go" data-k="receipts">${ICON.rcpt}<div class="grow"><div class="row-title">קבלות</div><div class="row-sub">החודש ${money(rs.month)}${rs.refunds ? `, החזרים ${money(rs.refunds)}` : ''}</div></div>${rs.pending ? `<span class="badge todo">${rs.pending} להגשה</span>` : ''}${ICON.chev}</button>
     <button class="row" data-act="more-go" data-k="doctor">${ICON.clip}<div class="grow"><div class="row-title">לרופא</div><div class="row-sub">דוח PDF, סיכום${qOpen ? ` ו${qOpen === 1 ? 'שאלה פתוחה אחת' : `-${qOpen} שאלות פתוחות`}` : ' ושאלות לביקור'}</div></div>${ICON.chev}</button>
+    ${Native.on ? `<button class="row" data-act="more-go" data-k="reminders">${icoBell()}<div class="grow"><div class="row-title">תזכורות</div><div class="row-sub">${Reminders.perm && Reminders.perm !== 'granted' ? 'ההתראות כבויות' : `${remActiveCount()} פעילות`}</div></div>${ICON.chev}</button>` : ''}
     <button class="row" data-act="more-go" data-k="guide">${ICON.book}<div class="grow"><div class="row-title">מדריך</div><div class="row-sub">פספוס הזרקה, אחסון, תזונה ותופעות לוואי</div></div>${ICON.chev}</button>
   </div>
   <div class="group mt"><button class="row" data-act="more-go" data-k="guide" data-open="g-red"><span style="color:var(--alert);display:flex">${ICON.warn}</span><div class="grow"><div class="row-title" style="color:var(--alert)">מתי לפנות לרופא מיד</div><div class="row-sub">סימנים שלא מחכים איתם</div></div>${ICON.chev}</button></div>
@@ -2959,7 +3080,7 @@ function openSettings() {
     <h3 class="h-sub" style="margin-top:4px">התרופה</h3>
     <div>${medChipsHTML(F.med)}</div>
     <div id="f-medblock">${medBlockHTML(false)}</div>
-    ${Native.on ? remSettingsHTML() : ''}${BYOK_ON ? aiSettingsHTML() : ''}
+    ${Native.on ? `<h3 class="h-sub" style="margin-top:26px">תזכורות</h3><div class="group"><button class="row" data-act="rem-page">${icoBell()}<div class="grow"><div class="row-title">ניהול התזכורות</div><div class="row-sub">מה מזכירים, באיזו שעה, ותזכורות משלכם</div></div>${ICON.chev}</button></div>` : ''}${BYOK_ON ? aiSettingsHTML() : ''}
     <h3 class="h-sub" style="margin-top:26px">יעדים</h3>
     <div class="two"><label class="field"><span class="fl">מים (כוסות ביום)</span><input type="number" inputmode="numeric" min="1" max="20" id="f-water" value="${esc(st.water || 8)}"></label><label class="field"><span class="fl">חלבון (גרם ביום)</span><input type="number" inputmode="numeric" min="0" max="300" id="f-protein" value="${st.protein ? esc(st.protein) : ''}" placeholder="לא נקבע"></label></div>
     <div class="two"><label class="field"><span class="fl">קלוריות ביום</span><input type="number" inputmode="numeric" min="0" max="6000" id="f-kcal" value="${st.kcal ? esc(st.kcal) : ''}" placeholder="לא נקבע"></label><label class="field"><span class="fl">סיבים (גרם ביום)</span><input type="number" inputmode="numeric" min="0" max="100" id="f-fiber" value="${st.fiber ? esc(st.fiber) : ''}" placeholder="לא נקבע"></label></div>
@@ -2967,7 +3088,7 @@ function openSettings() {
     <div class="field"><span class="fl">מראה</span><div class="chips" role="group" aria-label="מראה"><button class="chip" data-pick="theme" data-val="auto" aria-pressed="${F.theme === 'auto'}">לפי המכשיר</button><button class="chip" data-pick="theme" data-val="light" aria-pressed="${F.theme === 'light'}">בהיר</button><button class="chip" data-pick="theme" data-val="dark" aria-pressed="${F.theme === 'dark'}">כהה</button></div></div>
     <h3 class="h-sub" style="margin-top:26px">גיבוי ונתונים</h3>
     <p class="small muted">${storage}</p>
-    <div class="chips" style="margin-top:12px">${App.downloads ? '<button class="chip" data-act="export">ייצוא גיבוי</button>' : ''}<label class="chip file-btn">ייבוא גיבוי<input type="file" accept="application/json,.json" data-file="import"></label><button class="chip out" style="color:var(--alert)" data-act="wipe">מחיקת כל הנתונים</button></div>
+    ${Native.on ? `<div class="chips" style="margin-top:12px"><button class="chip" data-act="backup-drive">${icoCloud()} גיבוי ל-Google Drive</button></div><p class="tiny muted" style="margin-top:8px">נפתח חלון השיתוף של אנדרואיד: בוחרים Drive ואת התיקייה. כדי לשחזר, לוחצים ״שחזור מגיבוי״ ובוחרים את הקובץ מתוך Drive. גיבוי אחרון: ${lastBackupText()}.</p>` : ''}<div class="chips" style="margin-top:12px">${App.downloads ? `<button class="chip" data-act="export">${Native.on ? 'ייצוא לקובץ' : 'ייצוא גיבוי'}</button>` : ''}<label class="chip file-btn">${Native.on ? 'שחזור מגיבוי' : 'ייבוא גיבוי'}<input type="file" accept="application/json,.json" data-file="import"></label><button class="chip out" style="color:var(--alert)" data-act="wipe">מחיקת כל הנתונים</button></div>
     <p class="disclaimer" style="margin-top:20px">המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי.</p>`;
   Sheet.open('הגדרות', body, '<button class="btn" data-act="set-save">שמירת ההגדרות</button>', sh => {
     F.onChange = g => { if (g === 'theme') setTheme(F.theme); if (g === 'aiProv') { const b = $('#f-aiblock', sh); if (b) b.innerHTML = aiBlockHTML(); } medFormChange(sh, g, false); };
@@ -2979,7 +3100,7 @@ function settingsSave() {
   const kcal = Math.round(numVal($('#f-kcal', sh))), fiber = Math.round(numVal($('#f-fiber', sh))), height = Math.round(numVal($('#f-height', sh)));
   const f = { ...F }; if (!validMedForm(f)) return;
   const m = formMed(), changed = f.med !== (S.core.settings.med || 'mounjaro');
-  const remNew = Native.on ? readRemForm(sh, f) : null, akey = $('#f-akey', sh) ? $('#f-akey', sh).value.trim() : '', amodel = $('#f-amodel', sh) ? $('#f-amodel', sh).value.trim().slice(0, 80) : null;
+  const remNew = null, akey = $('#f-akey', sh) ? $('#f-akey', sh).value.trim() : '', amodel = $('#f-amodel', sh) ? $('#f-amodel', sh).value.trim().slice(0, 80) : null;
   if (!mutate('core', c => {
     const s = c.settings;
     s.med = f.med; if (f.med === 'custom') s.customMed = customMedFromF(f);
@@ -3247,7 +3368,7 @@ const inFoodSheet = () => F.kind === 'meal' || F.kind === 'fav';
 function setAux(html) { const a = $('#f-aux'); if (a) a.innerHTML = html; }
 function mealMethodChips() {
   const img = canOCR(), ai = App.sample && !App.sampleOff;
-  return `${img ? `<label class="chip file-btn">${ICON.cam}צילום הצלחת<input type="file" accept="image/*" data-file="meal"></label><label class="chip file-btn">${ICON.tag}צילום תווית<input type="file" accept="image/*" data-file="label"></label>` : ''}${ai ? `<button class="chip" data-act="meal-text">${ICON.spark}תיאור במילים</button>` : ''}${(S.core.favs || []).length && F.kind === 'meal' ? `<button class="chip" data-act="meal-fav">${ICON.star}מהשמורות</button>` : ''}<button class="chip" data-act="meal-manual">${ICON.plus}ידני</button>`;
+  return `${img ? `<label class="chip file-btn">${ICON.cam}צילום הצלחת<input type="file" accept="image/*" capture="environment" data-file="meal"></label><label class="chip file-btn">${ICON.img}צלחת מהגלריה<input type="file" accept="image/*" data-file="meal"></label><label class="chip file-btn">${ICON.tag}צילום תווית<input type="file" accept="image/*" capture="environment" data-file="label"></label><label class="chip file-btn">${ICON.img}תווית מהגלריה<input type="file" accept="image/*" data-file="label"></label>` : ''}${ai ? `<button class="chip" data-act="meal-text">${ICON.spark}תיאור במילים</button>` : ''}${(S.core.favs || []).length && F.kind === 'meal' ? `<button class="chip" data-act="meal-fav">${ICON.star}מהשמורות</button>` : ''}<button class="chip" data-act="meal-manual">${ICON.plus}ידני</button>`;
 }
 function itemRowHTML(it, i) {
   return `<div class="row"><div class="grow"><div class="row-title">${esc(it.name || 'מאכל')}${(+it.m || 1) !== 1 ? ` <span class="faint num">×${nf1(+it.m)}</span>` : ''}</div><div class="row-sub">${it.qty ? esc(it.qty) + ', ' : ''}${nutLine(itemVals(it))}</div></div><button class="chip out" data-act="item-edit" data-i="${i}">עריכה</button></div>`;
@@ -3759,6 +3880,17 @@ document.addEventListener('click', e => {
     case 'rem-exact': Reminders.askExact(); break;
     case 'akey-del': { const c = AIKeys.read(); delete c.keys[F.aiProv]; AIKeys.write(c); AIKeys.setup(); const b = $('#f-aiblock'); if (b) b.innerHTML = aiBlockHTML(); toast('המפתח הוסר'); break; }
     case 'ai-test': aiTest(); break;
+    case 'rem-page': openRemPage(); break;
+    case 'rem-tog': { const k = d.k; remSave(r => { r[k] = !r[k]; }); break; }
+    case 'rem-set': { const k = d.k, v = +d.v; remSave(r => { if (k.includes('.')) { const [a, b] = k.split('.'); r[a][b] = v; } else r[k] = v; }); break; }
+    case 'rem-test': Reminders.test(); break;
+    case 'rem-cnew': openCustomRem(null); break;
+    case 'rem-cedit': openCustomRem(d.id); break;
+    case 'rem-ctog': { const id = d.id; remSave(r => { const c = r.custom.find(x => x.id === id); if (c) c.on = !c.on; }); break; }
+    case 'rem-csave': customRemSave(); break;
+    case 'rem-cdel': { const id = F.id; if (remSave(r => { r.custom = r.custom.filter(x => x.id !== id); })) { Sheet.close(); toast('התזכורת נמחקה'); } break; }
+    case 'rc-day': { const v = +d.v, i = F.days.indexOf(v); if (i >= 0) F.days.splice(i, 1); else F.days.push(v); a.setAttribute('aria-pressed', String(i < 0)); break; }
+    case 'backup-drive': backupToDrive(); break;
     case 'cnt': { F.count = Math.max(1, Math.min(10, (+F.count || 1) + +d.n)); const el = $('#f-cnt'); if (el) el.textContent = F.count; break; }
     case 'go-supps': Sheet.close(); setTab('supps'); break;
     case 'seg': if (d.g === 'food' && (d.k === 'meals' || d.k === 'supps')) App.foodSeg = d.k; if (d.g === 'track' && ['summary', 'symptoms', 'body'].includes(d.k)) App.trackSeg = d.k; App.render(); window.scrollTo(0, 0); break;

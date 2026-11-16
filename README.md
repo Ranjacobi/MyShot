@@ -11,14 +11,14 @@ Personal tracker for weight-loss medications: doses, reminders, nutrition, suppl
 ## Features
 
 - **Your medication.** Weekly injections (Mounjaro, Zepbound, Wegovy, Ozempic), a daily injection (Saxenda), pills (Wegovy pill, Ozempic pill, Rybelsus, Foundayo, Contrave/Mysimba, Xenical/orlistat), or a custom medication. Each comes with its own dose steps, missed-dose rule, minimum gap between doses, storage notes and pen or pack type, taken from the official prescribing information.
-- **Reminders.** Notifications for the dose, a follow-up if it wasn't logged, the evening before, supplements, water, a weekly weigh-in, and low stock or an expiring pen. Buttons on the notification log the dose or snooze it for an hour.
+- **Reminders.** Notifications for the dose, a follow-up if it wasn't logged, the evening before, supplements, water, a weekly weigh-in, low stock or an expiring pen, and a weekly backup. Add your own reminders too, such as a blood test or a doctor's appointment. Buttons on the notification log the dose or snooze it for an hour.
 - **Injections.** Site rotation on a body map, the dose ladder, the dose plan from your doctor, and an estimated medication-level chart for weekly injections.
 - **Nutrition.** Log meals from a photo, a nutrition label, free text or by hand. Save recipes, and track daily protein, fiber, calories and water.
 - **Supplements.** What to take and when, by day of the week, with stock tracking. Protein shakes count toward daily protein.
 - **Tracking.** Side effects by day of the injection cycle, weight and BMI, progress photos with side-by-side comparison, and 7- and 30-day summaries.
 - **Receipts.** Photograph a receipt and, with an AI key, the date, amount, vendor and category fill in automatically.
 - **For the doctor.** A PDF report, a text summary and a list of questions for the next visit.
-- **Private.** All data stays on the phone. Backups and reports leave only through the Android share sheet.
+- **Private.** All data stays on the phone. Back up to Google Drive in one tap and restore from it later. Backups and reports leave only through the Android share sheet.
 
 ## Get the APK
 
@@ -57,11 +57,17 @@ After editing `www/index.html`, run `npx cap sync android`.
 
 ## Reminders
 
-Reminders are scheduled on the phone, so they arrive when the app is closed and offline. They're rescheduled after every change, so a follow-up never fires once the dose is logged. Turn each type on or off in **Settings → תזכורות**.
+Reminders are scheduled on the phone, so they arrive when the app is closed and offline. They're rescheduled after every change, so a follow-up never fires once the dose is logged.
+
+Manage them on the **עוד → תזכורות** screen: switch each type on or off, set its times, add your own reminders (one-time, daily, on chosen weekdays or monthly), see what's coming up, and send a test notification.
 
 - The app asks for notification permission on first launch (Android 13+).
 - On Android 14+, exact-time alarms need extra approval. Settings has a button for it; without it, Android may delay a reminder by a few minutes.
 - Some manufacturers stop notifications from apps they consider idle. If reminders don't arrive, exclude MyShot from battery optimization.
+
+## Backup to Google Drive
+
+**Settings → גיבוי ל-Google Drive** opens the Android share sheet with a backup file; choose Drive and a folder. To restore, tap **שחזור מגיבוי** and pick the file from Drive. Turn on the weekly backup reminder on the reminders screen, and its **גיבוי עכשיו** button does the same in one tap.
 
 ## AI features (optional)
 
