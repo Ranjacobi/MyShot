@@ -759,8 +759,9 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const CHANGELOG = [
+  ['1.4.1', 'צילום ארוחה עם זיהוי חזר לעבוד דרך המצלמה של הטלפון, ואפשר לצלם מחדש במקום זיהוי קודם'],
   ['1.4.0', 'מעבר מהיר בין מצב כהה לבהיר, קרדיט ומספר גרסה'],
   ['1.3.0', 'מצלמה לארוחות, לתוויות ולקבלות, מסך תזכורות עם תזכורות משלכם, וגיבוי ל-Google Drive'],
   ['1.2.0', 'Gemini מהיר יותר, עם ניסיון חוזר אוטומטי והודעות ברורות'],
@@ -1023,6 +1024,69 @@ function markSlotTaken(ds, slot) {
   if (App.ready && !Sheet.isOpen()) App.render();
   return items.length;
 }
+
+/* ---------- photos through the native camera (Android) ---------- */
+const PHOTO_KINDS = ['meal', 'label', 'receipt', 'progress'];
+function b64ToBlob(b64, format) {
+  const bin = atob(String(b64 || '').replace(/^data:[^,]*,/, '')), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new Blob([u8], { type: format === 'png' ? 'image/png' : 'image/jpeg' });
+}
+async function cameraBlob(C, camera) {
+  const size = { quality: 78, width: 1600, height: 1600, correctOrientation: true };
+  if (typeof C.getPhoto === 'function') {
+    const r = await C.getPhoto({ ...size, saveToGallery: false, resultType: 'base64', source: camera ? 'CAMERA' : 'PHOTOS' });
+    return b64ToBlob(r.base64String, r.format);
+  }
+  const r = camera ? await C.takePhoto(size) : await C.chooseFromGallery(size);
+  const x = (r && r.results && r.results[0]) || r || {}, src = x.webPath || x.path || x.uri;
+  if (!src) throw new Error('no photo');
+  const url = /^(https?|blob|data):/.test(src) ? src : window.Capacitor.convertFileSrc(src);
+  return await (await fetch(url)).blob();
+}
+function deliverPhoto(kind, blob) {
+  const file = new File([blob], `photo-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+  if (kind === 'meal') handleMealPhoto(file);
+  else if (kind === 'label') handleLabelPhoto(file);
+  else if (kind === 'receipt') handleReceiptFile(file);
+  else if (kind === 'progress') handleProgressFile(file);
+}
+async function nativePhoto(kind, camera) {
+  const C = Native.plugin('Camera'); if (!C) return false;
+  try { localStorage.setItem('mj-photo-pending', JSON.stringify({ kind, at: Date.now() })); } catch (e) {}
+  let blob = null;
+  try { blob = await cameraBlob(C, camera); }
+  catch (e) {
+    const msg = String((e && (e.message || e.errorMessage)) || e || '');
+    if (!/cancel/i.test(msg)) toast(camera ? 'לא הצלחנו לפתוח את המצלמה. נסו שוב או בחרו מהגלריה.' : 'לא הצלחנו לפתוח את הגלריה.', 'alert');
+  } finally { try { localStorage.removeItem('mj-photo-pending'); } catch (e) {} }
+  if (blob) deliverPhoto(kind, blob);
+  return true;
+}
+// Android can close the app while the camera is open; the plugin hands the photo back after the restart.
+function restorePhoto(ev) {
+  if (!ev || ev.pluginId !== 'Camera' || !ev.success || !ev.data) return;
+  let pend = null; try { pend = JSON.parse(localStorage.getItem('mj-photo-pending') || 'null'); localStorage.removeItem('mj-photo-pending'); } catch (e) {}
+  const kind = pend && pend.kind, d = ev.data; if (!PHOTO_KINDS.includes(kind)) return;
+  const blob = d.base64String ? b64ToBlob(d.base64String, d.format) : null; if (!blob) return;
+  const run = () => {
+    if (kind === 'meal' || kind === 'label') openMealSheet(null, null, null);
+    else if (kind === 'receipt') openReceiptForm();
+    else openPhotoSheet();
+    setTimeout(() => deliverPhoto(kind, blob), 250);
+  };
+  if (App.ready) run(); else App.afterReady = run;
+}
+// Every photo button goes through the native camera or gallery instead of the web view's file picker.
+document.addEventListener('click', e => {
+  if (!Native.on || !Native.plugin('Camera')) return;
+  const t = e.target; if (!t || !t.closest) return;
+  const inp = t.matches && t.matches('input[type=file]') ? t : (t.closest('label.file-btn') ? t.closest('label.file-btn').querySelector('input[type=file]') : null);
+  if (!inp || !PHOTO_KINDS.includes(inp.dataset.file)) return;
+  e.preventDefault(); e.stopPropagation();
+  nativePhoto(inp.dataset.file, inp.hasAttribute('capture'));
+}, true);
+
 const NativeFiles = {
   async save({ filename, data }) {
     const FS = Native.plugin('Filesystem'), Sh = Native.plugin('Share');
@@ -1302,6 +1366,7 @@ async function nativeBoot() {
         if (App.tab !== 'home') { setTab('home', true); return; }
         AP.exitApp();
       });
+      AP.addListener('appRestoredResult', ev => { try { restorePhoto(ev); } catch (e) {} });
       AP.addListener('appStateChange', st => {
         if (st && st.isActive) { nativeBars(); syncThemeBtn(); if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
         else Sync.flushAll();
@@ -3486,7 +3551,7 @@ const inFoodSheet = () => F.kind === 'meal' || F.kind === 'fav';
 function setAux(html) { const a = $('#f-aux'); if (a) a.innerHTML = html; }
 function mealMethodChips() {
   const img = canOCR(), ai = App.sample && !App.sampleOff;
-  return `${img ? `<label class="chip file-btn">${ICON.cam}צילום הצלחת<input type="file" accept="image/*" capture="environment" data-file="meal"></label><label class="chip file-btn">${ICON.img}צלחת מהגלריה<input type="file" accept="image/*" data-file="meal"></label><label class="chip file-btn">${ICON.tag}צילום תווית<input type="file" accept="image/*" capture="environment" data-file="label"></label><label class="chip file-btn">${ICON.img}תווית מהגלריה<input type="file" accept="image/*" data-file="label"></label>` : ''}${ai ? `<button class="chip" data-act="meal-text">${ICON.spark}תיאור במילים</button>` : ''}${(S.core.favs || []).length && F.kind === 'meal' ? `<button class="chip" data-act="meal-fav">${ICON.star}מהשמורות</button>` : ''}<button class="chip" data-act="meal-manual">${ICON.plus}ידני</button>`;
+  return `${img ? `<label class="chip file-btn">${ICON.cam}צילום הצלחת<input type="file" accept="image/*" capture="environment" data-file="meal"></label><label class="chip file-btn">${ICON.img}צלחת מהגלריה<input type="file" accept="image/*" data-file="meal"></label><label class="chip file-btn">${ICON.tag}צילום תווית<input type="file" accept="image/*" capture="environment" data-file="label"></label><label class="chip file-btn">${ICON.img}תווית מהגלריה<input type="file" accept="image/*" data-file="label"></label>` : (BYOK_ON ? `<button class="chip" data-act="ai-setup">${ICON.cam}צילום וזיהוי — צריך מפתח AI</button>` : '')}${ai ? `<button class="chip" data-act="meal-text">${ICON.spark}תיאור במילים</button>` : ''}${(S.core.favs || []).length && F.kind === 'meal' ? `<button class="chip" data-act="meal-fav">${ICON.star}מהשמורות</button>` : ''}<button class="chip" data-act="meal-manual">${ICON.plus}ידני</button>`;
 }
 function itemRowHTML(it, i) {
   return `<div class="row"><div class="grow"><div class="row-title">${esc(it.name || 'מאכל')}${(+it.m || 1) !== 1 ? ` <span class="faint num">×${nf1(+it.m)}</span>` : ''}</div><div class="row-sub">${it.qty ? esc(it.qty) + ', ' : ''}${nutLine(itemVals(it))}</div></div><button class="chip out" data-act="item-edit" data-i="${i}">עריכה</button></div>`;
@@ -3537,7 +3602,9 @@ async function mealAI(prompt, opts, statusText) {
 function addAIItems(items, src) {
   readItemEditor(); F.editIdx = null;
   if (items.length) { F.items.push(...items); if (F.kind === 'meal') F.src = src; }
-  setAux(items.length ? `<div class="note info">${items.length === 1 ? 'נוסף מאכל אחד' : `נוספו ${items.length} מאכלים`}. אלה הערכות — בדקו את הכמויות ותקנו אם צריך.</div>` : '<div class="note warn">לא זיהינו מאכלים. נסו תמונה אחרת או תיאור במילים.</div>');
+  F.aiBatch = items.length && src === 'photo' ? items.slice() : null;
+  const again = src === 'photo' && canOCR() ? `<div style="margin-top:10px"><button class="chip out" data-act="meal-rephoto" style="background:var(--surface)">${ICON.cam}צילום מחדש במקום הזיהוי הזה</button></div>` : '';
+  setAux(items.length ? `<div class="note info">${items.length === 1 ? 'נוסף מאכל אחד' : `נוספו ${items.length} מאכלים`}. אלה הערכות: אפשר לתקן כל מאכל בכפתור ״עריכה״, או לצלם שוב.${again}</div>` : `<div class="note warn">לא זיהינו מאכלים. נסו תמונה אחרת או תיאור במילים.${again}</div>`);
   renderItems();
 }
 async function imageForAI(file) {
@@ -4013,6 +4080,15 @@ document.addEventListener('click', e => {
     case 'rem-cdel': { const id = F.id; if (remSave(r => { r.custom = r.custom.filter(x => x.id !== id); })) { Sheet.close(); toast('התזכורת נמחקה'); } break; }
     case 'rc-day': { const v = +d.v, i = F.days.indexOf(v); if (i >= 0) F.days.splice(i, 1); else F.days.push(v); a.setAttribute('aria-pressed', String(i < 0)); break; }
     case 'backup-drive': backupToDrive(); break;
+    case 'meal-rephoto': {
+      readItemEditor(); F.editIdx = null;
+      if (F.aiBatch) { const old = new Set(F.aiBatch); F.items = F.items.filter(x => !old.has(x)); F.aiBatch = null; renderItems(); }
+      setAux('');
+      if (!(Native.on && Native.plugin('Camera'))) { const inp = document.querySelector('#sheet input[data-file="meal"][capture]'); if (inp) inp.click(); }
+      else nativePhoto('meal', true);
+      break;
+    }
+    case 'ai-setup': openSettings(); setTimeout(() => { const h = Array.from(document.querySelectorAll('#sheet h3')).find(x => x.textContent.includes('בינה מלאכותית')); if (h) h.scrollIntoView({ block: 'start' }); }, 80); break;
     case 'cnt': { F.count = Math.max(1, Math.min(10, (+F.count || 1) + +d.n)); const el = $('#f-cnt'); if (el) el.textContent = F.count; break; }
     case 'go-supps': Sheet.close(); setTab('supps'); break;
     case 'seg': if (d.g === 'food' && (d.k === 'meals' || d.k === 'supps')) App.foodSeg = d.k; if (d.g === 'track' && ['summary', 'symptoms', 'body'].includes(d.k)) App.trackSeg = d.k; App.render(); window.scrollTo(0, 0); break;
@@ -4090,6 +4166,7 @@ async function boot() {
     if (App.ready) return;
     App.ready = true; App.render();
     if (Native.on) { Reminders.flush(); Reminders.soon(800); }
+    if (App.afterReady) { const f = App.afterReady; App.afterReady = null; setTimeout(f, 300); }
     if (Backend.loaded.core && !S.core.settings.setup && !App.readOnly && !App.slow) setTimeout(() => { if (!Sheet.isOpen()) openOnboarding(); }, 300);
   };
   if (Backend.mode === 'cloud') Backend.startCloud(done);

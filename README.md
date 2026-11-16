@@ -13,7 +13,7 @@ Personal tracker for weight-loss medications: doses, reminders, nutrition, suppl
 - **Your medication.** Weekly injections (Mounjaro, Zepbound, Wegovy, Ozempic), a daily injection (Saxenda), pills (Wegovy pill, Ozempic pill, Rybelsus, Foundayo, Contrave/Mysimba, Xenical/orlistat), or a custom medication. Each comes with its own dose steps, missed-dose rule, minimum gap between doses, storage notes and pen or pack type, taken from the official prescribing information.
 - **Reminders.** Notifications for the dose, a follow-up if it wasn't logged, the evening before, supplements, water, a weekly weigh-in, low stock or an expiring pen, and a weekly backup. Add your own reminders too, such as a blood test or a doctor's appointment. Buttons on the notification log the dose or snooze it for an hour.
 - **Injections.** Site rotation on a body map, the dose ladder, the dose plan from your doctor, and an estimated medication-level chart for weekly injections.
-- **Nutrition.** Log meals from a photo, a nutrition label, free text or by hand. Save recipes, and track daily protein, fiber, calories and water.
+- **Nutrition.** Log meals from a photo (camera or gallery), a nutrition label, free text or by hand. The AI's estimates stay editable item by item, and a retake replaces the last detection. Save recipes, and track daily protein, fiber, calories and water.
 - **Supplements.** What to take and when, by day of the week, with stock tracking. Protein shakes count toward daily protein.
 - **Tracking.** Side effects by day of the injection cycle, weight and BMI, progress photos with side-by-side comparison, and 7- and 30-day summaries.
 - **Receipts.** Photograph a receipt and, with an AI key, the date, amount, vendor and category fill in automatically.
