@@ -6,8 +6,26 @@
     "backgroundColor": "#F3F5F8"
   },
   "plugins": {
-    "SystemBars": { "insetsHandling": "css" },
-    "LocalNotifications": { "smallIcon": "ic_stat_myshot", "iconColor": "#18224F" },
-    "SplashScreen": { "launchShowDuration": 600, "launchAutoHide": true, "backgroundColor": "#F3F5F8", "showSpinner": false }
+    "SystemBars": {
+      "insetsHandling": "css"
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_myshot",
+      "iconColor": "#18224F"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": true,
+      "backgroundColor": "#F3F5F8",
+      "showSpinner": false
+    },
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      }
+    }
   }
 }

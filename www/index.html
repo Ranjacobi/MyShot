@@ -508,6 +508,20 @@ select{appearance:auto;}
 @media (prefers-reduced-motion: reduce){.ab-seg{animation:none;stroke-dashoffset:0}.ab-needle{animation:none}.credit-name,.about-name{animation:none;background:none;color:var(--ink)}}
 .scan-wait{text-align:center;padding:14px 0 6px}.spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--btn);animation:spin .9s linear infinite;margin:10px auto 12px}@keyframes spin{to{transform:rotate(360deg)}}.scan-list{margin:6px 0 0;padding-inline-start:20px}.scan-list li{margin:3px 0}@media (prefers-reduced-motion: reduce){.spin{animation:none}}
 .chip[aria-pressed="true"] .faint{color:inherit;opacity:.8}
+
+#lock{position:fixed;inset:0;z-index:10000;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:var(--safe-area-inset-top,env(safe-area-inset-top,0px)) 20px var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))}
+#lock[hidden]{display:none}
+html.is-locked body>*:not(#lock){visibility:hidden}
+.lock-in{width:100%;max-width:320px;text-align:center}
+.lock-logo{width:64px;height:64px;margin:0 auto 10px}.lock-logo svg{width:100%;height:100%}
+.lock-in h2{font-family:var(--font-display);font-size:24px;margin:0;color:var(--ink)}
+.lock-msg{color:var(--ink-2);margin:6px 0 16px;min-height:1.4em}.lock-msg.bad{color:var(--alert)}
+.lock-dots{display:flex;gap:12px;justify-content:center;margin-bottom:22px;direction:ltr}
+.lock-dots i{width:13px;height:13px;border-radius:50%;border:2px solid var(--ink-3)}.lock-dots i.on{background:var(--ink);border-color:var(--ink)}
+.lock-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;direction:ltr}
+.lock-key{height:64px;border-radius:50%;border:0;background:var(--surface-2);color:var(--ink);font-size:24px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.lock-key:active{background:var(--line)}.lock-key.off{visibility:hidden;pointer-events:none}
+.card-chart{margin-top:12px;background:var(--surface);border-radius:16px;padding:10px 8px}.steps-chart{width:100%;height:auto;display:block}.sb{fill:var(--seg-todo)}.sb-ok{fill:var(--ok)}.sb-goal{stroke:var(--ink-3);stroke-width:1.5;stroke-dasharray:4 4}.sb-l{font-size:11px;fill:var(--ink-3);text-anchor:middle}
 </style>
 </head>
 <body>
@@ -535,6 +549,7 @@ select{appearance:auto;}
 <div id="overlay"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"><span></span></div>
 
+<script src="google-config.js"></script>
 <script>
 (() => {
 'use strict';
@@ -761,8 +776,9 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const CHANGELOG = [
+  ['1.6.0', 'התראות דיסקרטיות, נעילה בקוד או בטביעת אצבע, אימונים וצעדים, גיבוי אוטומטי ל-Drive'],
   ['1.5.0', 'צילום תוסף: זיהוי, הסבר, התאמה לטיפול, זמנים מומלצים ותזכורות, כולל תזכורת כשמתעדים ארוחה'],
   ['1.4.2', 'בחירת מודל AI מרשימה שמתעדכנת לבד: רק המודלים הזולים שמזהים תמונות'],
   ['1.4.1', 'צילום ארוחה עם זיהוי חזר לעבוד דרך המצלמה של הטלפון, ואפשר לצלם מחדש במקום זיהוי קודם'],
@@ -847,20 +863,23 @@ function confetti(origin) {
   setTimeout(() => layer.remove(), 2200);
 }
 
-const REM_DEF = { dose: true, follow: true, followH: 0, eve: false, eveTime: '20:00', supps: true, water: false, water_: { from: '10:00', to: '20:00', every: 3 }, weigh: false, weighDay: 5, weighTime: '08:00', stock: true, backup: false, backupDay: 5, backupTime: '20:00', time2: '20:00', slots: { morning: '08:00', noon: '13:00', evening: '19:00', night: '22:00', workout: '18:00' }, custom: [] };
+const REM_DEF = { discreet: true, train: false, trainDays: [0, 2, 4], dose: true, follow: true, followH: 0, eve: false, eveTime: '20:00', supps: true, water: false, water_: { from: '10:00', to: '20:00', every: 3 }, weigh: false, weighDay: 5, weighTime: '08:00', stock: true, backup: false, backupDay: 5, backupTime: '20:00', time2: '20:00', slots: { morning: '08:00', noon: '13:00', evening: '19:00', night: '22:00', workout: '18:00' }, custom: [] };
 function remCfg() { const r = (S.core.settings && S.core.settings.rem) || {}; return { ...REM_DEF, ...r, slots: { ...REM_DEF.slots, ...(r.slots || {}) }, water_: { ...REM_DEF.water_, ...(r.water_ || {}) }, custom: Array.isArray(r.custom) ? r.custom.map(c => ({ ...c, days: Array.isArray(c.days) ? c.days.slice() : [] })) : [] }; }
 function remSave(fn) { return mutate('core', c => { const keep = S.core.settings.rem; S.core.settings.rem = c.settings.rem; const r = remCfg(); S.core.settings.rem = keep; fn(r); c.settings.rem = r; }); }
 const recentBackup = () => { try { return Date.now() - (+localStorage.getItem('mj-lastbackup') || 0) < 30 * DAY; } catch (e) { return false; } };
 
+// Discreet mode: nothing about the medication, dose or body on the lock screen.
+const DISCREET = { dose: ['MyShot', 'תזכורת: הגיע הזמן לסמן ביומן'], eve: ['MyShot', 'תזכורת למחר'], supps: ['MyShot', 'תזכורת: תוספים'], weigh: ['MyShot', 'תזכורת שבועית'], stock: ['MyShot', 'תזכורת: לבדוק את המלאי'], train: ['MyShot', 'תזכורת: אימון'] };
 const Reminders = {
   timer: null, perm: null, exact: null, queue: [], busy: false, last: [],
   ln() { return Native.plugin('LocalNotifications'); },
   async init() {
     const LN = this.ln(); if (!LN) return;
     try {
-      await LN.createChannel({ id: 'meds', name: 'התרופה', description: 'תזכורות למנה או להזרקה', importance: 5, visibility: 1, vibration: true });
-      await LN.createChannel({ id: 'supps', name: 'תוספים', description: 'תזכורות לתוספים', importance: 4, visibility: 1, vibration: true });
-      await LN.createChannel({ id: 'general', name: 'כללי', description: 'מים, שקילה ומלאי', importance: 3, visibility: 1 });
+      for (const old of ['meds', 'supps', 'general']) { try { await LN.deleteChannel({ id: old }); } catch (e) {} }
+      await LN.createChannel({ id: 'meds2', name: 'התרופה', description: 'תזכורות למנה או להזרקה', importance: 5, visibility: 0, vibration: true });
+      await LN.createChannel({ id: 'supps2', name: 'תוספים', description: 'תזכורות לתוספים', importance: 4, visibility: 0, vibration: true });
+      await LN.createChannel({ id: 'general2', name: 'כללי', description: 'מים, שקילה, אימונים ומלאי', importance: 3, visibility: 0 });
     } catch (e) {}
     try { await LN.registerActionTypes({ types: [{ id: 'DOSE', actions: [{ id: 'taken', title: 'תיעדתי' }, { id: 'snooze', title: 'בעוד שעה' }] }, { id: 'SUPPS', actions: [{ id: 'taken', title: 'לקחתי הכול' }] }, { id: 'BACKUP', actions: [{ id: 'backup', title: 'גיבוי עכשיו' }] }] }); } catch (e) {}
     try { await LN.addListener('localNotificationActionPerformed', ev => { this.queue.push(ev); this.flush(); }); } catch (e) {}
@@ -914,7 +933,9 @@ const Reminders = {
     const at = (d, hm) => { const [h, mi] = String(hm || '09:00').split(':').map(Number); const x = new Date(d); x.setHours(h || 0, mi || 0, 0, 0); return x; };
     const add = (id, when, title, body, extra, ch, action) => {
       if (!(when > now) || when - now > 62 * DAY) return;
-      const n = { id, title, body, largeBody: body, schedule: { at: when, allowWhileIdle: true }, channelId: ch || 'general', extra: extra || {}, smallIcon: 'ic_stat_myshot', iconColor: '#18224F' };
+      const k = (extra || {}).kind, quiet = r.discreet && DISCREET[k];
+      if (quiet) { title = quiet[0]; body = quiet[1]; }
+      const n = { id, title, body, largeBody: body, schedule: { at: when, allowWhileIdle: true }, channelId: ({ meds: 'meds2', supps: 'supps2', general: 'general2' })[ch || 'general'] || 'general2', extra: extra || {}, smallIcon: 'ic_stat_myshot', iconColor: '#18224F' };
       if (action) n.actionTypeId = action;
       out.push(n);
     };
@@ -977,6 +998,13 @@ const Reminders = {
       if (low) add(7000, at(addDays(startOfDay(now), 1), '10:00'), 'המלאי עומד להיגמר', low, { kind: 'stock' }, 'general');
       if (pen.discard && pen.open) add(7001, at(addDays(pen.discard, -2), '10:00'), 'העט שבשימוש — עוד יומיים', `לפי ההוראות זורקים אותו ב${fmtDay(pen.discard)}.`, { kind: 'stock' }, 'general');
     }
+    if (r.train) {
+      for (let i = 0; i < 14; i++) {
+        const day = addDays(startOfDay(now), i), ds = toDateStr(day);
+        if (!(r.trainDays || []).includes(day.getDay()) || (S.train.items || []).some(x => x.d === ds)) continue;
+        add(6700 + i, at(day, r.slots.workout), 'זמן לאימון', 'אימון כוח קצר עוזר לשמור על השריר בזמן ירידה במשקל.', { kind: 'train' }, 'general');
+      }
+    }
     if (r.backup) {
       let d = nextOccurrence(startOfDay(now), r.backupDay, r.backupTime); if (d <= now) d = addDays(d, 7);
       for (let k = 0; k < 4; k++) add(6500 + k, addDays(d, 7 * k), 'זמן לגיבוי', 'שמירת גיבוי של MyShot ב-Google Drive', { kind: 'backup' }, 'general', 'BACKUP');
@@ -988,7 +1016,7 @@ const Reminders = {
     for (const z of this.snoozes()) add(z.id, new Date(z.at), z.title, z.body, z.extra, z.extra && z.extra.kind === 'test' ? 'general' : z.extra && z.extra.kind === 'supps' ? 'supps' : 'meds', z.action === undefined ? 'DOSE' : z.action);
     return out;
   },
-  flush() { if (!App.ready) return; while (this.queue.length) { try { this.handle(this.queue.shift()); } catch (e) { console.warn(e); } } },
+  flush() { if (!App.ready || Lock.locked) return; while (this.queue.length) { try { this.handle(this.queue.shift()); } catch (e) { console.warn(e); } } },
   handle(ev) {
     const n = (ev && ev.notification) || {}, x = n.extra || {}, a = ev && ev.actionId;
     if (x.kind === 'dose' || x.kind === 'eve') {
@@ -1002,6 +1030,7 @@ const Reminders = {
     }
     if (x.kind === 'weigh') { setTab('body'); setTimeout(() => openWeightForm(), 120); return; }
     if (x.kind === 'backup') { backupToDrive(); return; }
+    if (x.kind === 'train') { setTab('train'); setTimeout(() => openTrainForm(), 120); return; }
     if (x.kind === 'custom' || x.kind === 'test') { openRemPage(); return; }
     if (x.kind === 'stock') { setTab('shots'); return; }
     setTab('home', true);
@@ -1027,6 +1056,257 @@ function markSlotTaken(ds, slot) {
   for (const q of items) setTaken(ds, q.sp, q.slot, q.sp.qty);
   if (App.ready && !Sheet.isOpen()) App.render();
   return items.length;
+}
+
+
+/* ---------- app lock (optional): PIN, plus fingerprint or the phone's screen lock ---------- */
+const b64 = u8 => btoa(String.fromCharCode(...u8));
+const unb64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+const Bio = {
+  p() { return Native.plugin('BiometricAuthNative'); },
+  async available() {
+    const B = this.p(); if (!B) return false;
+    try { const r = await B.checkBiometry(); return !!(r && (r.isAvailable || r.strongBiometryIsAvailable || r.deviceIsSecure)); } catch (e) { return false; }
+  },
+  async auth() {
+    const B = this.p(); if (!B) return false;
+    const opts = { reason: 'פתיחת MyShot', cancelTitle: 'ביטול', allowDeviceCredential: true, androidTitle: 'פתיחת MyShot', androidSubtitle: 'טביעת אצבע או נעילת המסך של הטלפון', androidConfirmationRequired: false };
+    for (const m of ['internalAuthenticate', 'authenticate']) {
+      try { await B[m](opts); return true; }
+      catch (e) { if (/UNIMPLEMENTED|not implemented/i.test(String((e && (e.code || e.message)) || e))) continue; return false; }
+    }
+    return false;
+  },
+};
+const Lock = {
+  locked: false, fails: 0, until: 0, bgAt: 0, waiting: [], entry: '',
+  cfg() { try { return JSON.parse(localStorage.getItem('mj-lock') || 'null'); } catch (e) { return null; } },
+  on() { const c = this.cfg(); return !!(c && c.on && c.hash); },
+  async hash(pin, salt) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 120000 }, key, 256);
+    return b64(new Uint8Array(bits));
+  },
+  async setPin(pin) {
+    const salt = crypto.getRandomValues(new Uint8Array(16)), c = this.cfg() || {};
+    const next = { on: true, len: pin.length, salt: b64(salt), hash: await this.hash(pin, salt), bio: !!c.bio, after: c.after === undefined ? 0 : c.after };
+    try { localStorage.setItem('mj-lock', JSON.stringify(next)); } catch (e) {}
+  },
+  async check(pin) { const c = this.cfg(); if (!c) return false; return (await this.hash(pin, unb64(c.salt))) === c.hash; },
+  patch(p) { const c = this.cfg(); if (!c) return; try { localStorage.setItem('mj-lock', JSON.stringify({ ...c, ...p })); } catch (e) {} },
+  off() { try { localStorage.removeItem('mj-lock'); } catch (e) {} this.locked = false; this.hide(); },
+  whenOpen(fn) { if (this.locked) this.waiting.push(fn); else fn(); },
+  show() {
+    if (!this.on()) return;
+    this.locked = true; this.entry = '';
+    let el = document.getElementById('lock');
+    if (!el) { el = document.createElement('div'); el.id = 'lock'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'MyShot נעולה'); document.body.appendChild(el); }
+    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'bio', '0', 'del'];
+    el.innerHTML = `<div class="lock-in"><div class="lock-logo">${LOGO_MARK}</div><h2>MyShot נעולה</h2><p class="lock-msg" id="lock-msg">הקלידו את הקוד</p>
+      <div class="lock-dots" id="lock-dots" aria-hidden="true">${'<i></i>'.repeat((this.cfg() || {}).len || 6)}</div>
+      <div class="lock-keys">${keys.map(k => k === 'bio' ? `<button class="lock-key lock-bio off" data-lock="bio" aria-label="פתיחה בטביעת אצבע" tabindex="-1">☝︎</button>` : k === 'del' ? '<button class="lock-key" data-lock="del" aria-label="מחיקה">⌫</button>' : `<button class="lock-key num" data-lock="${k}">${k}</button>`).join('')}</div></div>`;
+    el.hidden = false; document.documentElement.classList.add('is-locked');
+    const c = this.cfg();
+    if (c && c.bio) Bio.available().then(ok => { const b = el.querySelector('.lock-bio'); if (b && ok) { b.classList.remove('off'); b.removeAttribute('tabindex'); this.tryBio(); } });
+  },
+  hide() { const el = document.getElementById('lock'); if (el) el.hidden = true; document.documentElement.classList.remove('is-locked'); },
+  dots() { const d = document.querySelectorAll('#lock-dots i'); d.forEach((x, i) => x.classList.toggle('on', i < this.entry.length)); },
+  msg(t, bad) { const m = document.getElementById('lock-msg'); if (m) { m.textContent = t; m.classList.toggle('bad', !!bad); } },
+  async tryBio() { if (await Bio.auth()) this.open(); },
+  open() { this.locked = false; this.fails = 0; this.hide(); const w = this.waiting.splice(0); for (const f of w) { try { f(); } catch (e) {} } Reminders.flush(); },
+  async key(k) {
+    if (k === 'bio') { this.tryBio(); return; }
+    if (Date.now() < this.until) { this.msg(`יותר מדי ניסיונות. נסו שוב בעוד ${Math.ceil((this.until - Date.now()) / 1000)} שניות.`, true); return; }
+    if (k === 'del') { this.entry = this.entry.slice(0, -1); this.dots(); return; }
+    const len = (this.cfg() || {}).len || 6;
+    if (this.entry.length >= len) return;
+    this.entry += k; this.dots();
+    if (this.entry.length < len) return;
+    if (await this.check(this.entry)) { this.open(); return; }
+    {
+      this.fails++; this.entry = ''; this.dots();
+      if (this.fails >= 5) { this.until = Date.now() + 30000; this.fails = 0; this.msg('יותר מדי ניסיונות. נסו שוב בעוד 30 שניות.', true); }
+      else this.msg('קוד שגוי', true);
+      const box = document.querySelector('.lock-dots'); if (box && box.animate && !reducedMotion()) box.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-10px)' }, { transform: 'translateX(10px)' }, { transform: 'translateX(0)' }], { duration: 300 });
+    }
+  },
+};
+document.addEventListener('click', e => { const b = e.target && e.target.closest && e.target.closest('[data-lock]'); if (b) { e.preventDefault(); Lock.key(b.dataset.lock); } }, true);
+function lockSettingsHTML() {
+  const c = Lock.cfg(), on = Lock.on(), after = c && c.after !== undefined ? c.after : 0;
+  let h = `<h3 class="h-sub" style="margin-top:26px">נעילת אפליקציה</h3><div class="group"><div class="row"><div class="grow"><div class="row-title">נעילה בקוד</div><div class="row-sub">${on ? 'פועלת' : 'כבויה. אפשר להפעיל ולבחור קוד של 4 עד 6 ספרות'}</div></div><button class="sw" role="switch" aria-checked="${on}" aria-label="נעילה בקוד" data-act="lock-toggle"></button></div>`;
+  if (on) h += `<div class="row"><div class="grow"><div class="row-title">פתיחה בטביעת אצבע</div><div class="row-sub" id="f-bio-sub">או בנעילת המסך של הטלפון</div></div><button class="sw" role="switch" aria-checked="${!!c.bio}" aria-label="פתיחה בטביעת אצבע" data-act="lock-bio"></button></div>
+    <div class="row col"><span class="row-title">לנעול</span><div class="chips">${[[0, 'מיד ביציאה'], [60, 'אחרי דקה'], [300, 'אחרי 5 דקות']].map(([v, l]) => `<button class="chip" data-act="lock-after" data-v="${v}" aria-pressed="${after === v}">${l}</button>`).join('')}</div></div>
+    <button class="row add" data-act="lock-change"><span class="grow">שינוי הקוד</span>${ICON.chev}</button>`;
+  h += '</div>';
+  if (on) h += '<p class="tiny muted" style="margin-top:8px">שכחתם את הקוד? אם טביעת האצבע פעילה, פותחים איתה ומחליפים קוד. אחרת אין דרך לשחזר אותו בלי למחוק את נתוני האפליקציה, ולכן כדאי לשמור גיבוי.</p>';
+  return h;
+}
+function openPinSheet(mode) {
+  F = { kind: 'pin', mode, step: 1, first: '' };
+  Sheet.open(mode === 'change' ? 'קוד חדש' : 'בחירת קוד', `<p class="lead" id="pin-q" style="margin-top:4px">הקלידו קוד של 4 עד 6 ספרות</p><label class="field"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="f-pin" autocomplete="off" style="text-align:center;font-size:26px;letter-spacing:.4em" dir="ltr"></label><div id="pin-err"></div>`, '<button class="btn" data-act="pin-next">המשך</button>');
+}
+async function pinNext() {
+  const sh = $('#sheet'), v = (($('#f-pin', sh) || {}).value || '').trim();
+  if (!/^\d{4,6}$/.test(v)) { $('#pin-err', sh).innerHTML = '<div class="note warn">קוד של 4 עד 6 ספרות בלבד.</div>'; return; }
+  if (F.step === 1) { F.first = v; F.step = 2; $('#f-pin', sh).value = ''; $('#pin-q', sh).textContent = 'הקלידו שוב לאישור'; $('#pin-err', sh).innerHTML = ''; return; }
+  if (v !== F.first) { F.step = 1; F.first = ''; $('#f-pin', sh).value = ''; $('#pin-q', sh).textContent = 'הקלידו קוד של 4 עד 6 ספרות'; $('#pin-err', sh).innerHTML = '<div class="note warn">הקודים לא תאמו. נסו שוב.</div>'; return; }
+  await Lock.setPin(v); Sheet.close(); toast('הנעילה פועלת'); setTimeout(() => openSettings(), 250);
+}
+
+
+/* ---------- strength training and steps ---------- */
+const TRAIN_TYPES = { strength: 'כוח', cardio: 'אירובי', walk: 'הליכה', other: 'אחר' };
+const nfi = n => Number(n || 0).toLocaleString('he-IL');
+const weekStart = (d = new Date()) => { const x = startOfDay(d); return addDays(x, -x.getDay()); };
+const stepsOn = ds => +((S.daily.days[ds] || {}).steps) || 0;
+function trainStats(now = new Date()) {
+  const ws = toDateStr(weekStart(now)), td = toDateStr(now), week = (S.train.items || []).filter(x => x.d >= ws && x.d <= td);
+  let sum = 0, n = 0; for (let i = 0; i < 7; i++) { const v = stepsOn(toDateStr(addDays(startOfDay(now), -i))); if (v) { sum += v; n++; } }
+  return { strength: week.filter(x => x.type === 'strength').length, minutes: week.reduce((a, x) => a + (+x.min || 0), 0), stepsAvg: n ? Math.round(sum / n) : 0, stepsToday: stepsOn(td) };
+}
+function stepsChartHTML(goal) {
+  const days = []; for (let i = 6; i >= 0; i--) { const d = addDays(startOfDay(new Date()), -i); days.push({ d, v: stepsOn(toDateStr(d)) }); }
+  if (!days.some(x => x.v)) return '';
+  const W = 320, H = 120, max = Math.max(goal, ...days.map(x => x.v)) * 1.1, bw = W / 7;
+  const bars = days.map((x, i) => { const bh = Math.round(x.v / max * (H - 26)), xp = W - (i + 1) * bw + 6; return `<rect x="${xp}" y="${H - 18 - bh}" width="${bw - 12}" height="${Math.max(bh, x.v ? 2 : 0)}" rx="4" class="${x.v >= goal ? 'sb-ok' : 'sb'}"/><text x="${xp + (bw - 12) / 2}" y="${H - 4}" class="sb-l">${DAYS_SHORT[x.d.getDay()]}</text>`; }).join('');
+  const gy = H - 18 - Math.round(goal / max * (H - 26));
+  return `<div class="card-chart"><svg viewBox="0 0 ${W} ${H}" class="steps-chart" role="img" aria-label="צעדים בשבוע האחרון">${bars}<line x1="0" x2="${W}" y1="${gy}" y2="${gy}" class="sb-goal"/></svg></div>`;
+}
+function trainHTML() {
+  const st = S.core.settings, goal = st.trainGoal || 2, sg = st.stepGoal || 7000, t = trainStats(), pc = Math.min(100, Math.round(t.strength / goal * 100));
+  let h = `<button class="btn block" style="margin-top:14px" data-act="log-train">${ICON.plus} תיעוד אימון</button>`;
+  h += `<h2 class="h-section">השבוע</h2><div class="group">
+    <div class="row col"><div class="rowline"><span class="row-title">אימוני כוח</span><span class="row-sub num">${t.strength} מתוך ${goal}</span></div><div class="pbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pc}"><i style="width:${pc}%"></i></div></div>
+    <div class="row"><div class="grow"><div class="row-title">דקות פעילות</div><div class="row-sub">מתחילת השבוע</div></div><div class="end num" style="font-weight:600">${t.minutes}</div></div>
+    <div class="row"><div class="grow"><div class="row-title">צעדים היום</div><div class="row-sub">יעד ${nfi(sg)} · ממוצע 7 ימים: ${t.stepsAvg ? nfi(t.stepsAvg) : '—'}</div></div><button class="chip out" data-act="steps-edit">${t.stepsToday ? nfi(t.stepsToday) : 'הוספה'}</button></div>
+  </div>` + stepsChartHTML(sg);
+  h += '<p class="tiny muted mt">אימוני כוח עוזרים לשמור על מסת השריר בזמן ירידה במשקל. ההמלצה הכללית למבוגרים: פעמיים בשבוע לפחות.</p>';
+  h += `<h2 class="h-section">יעדים</h2><div class="group"><div class="row col"><span class="row-title">אימוני כוח בשבוע</span><div class="chips">${[1, 2, 3, 4].map(n => `<button class="chip num" data-act="train-goal" data-v="${n}" aria-pressed="${goal === n}">${n}</button>`).join('')}</div></div><div class="row col"><span class="row-title">צעדים ביום</span><div class="chips">${[5000, 7000, 8000, 10000].map(n => `<button class="chip num" data-act="step-goal" data-v="${n}" aria-pressed="${sg === n}">${nfi(n)}</button>`).join('')}</div></div></div>`;
+  const list = (S.train.items || []).slice().sort((a, b) => (b.d + (b.t || '')) < (a.d + (a.t || '')) ? -1 : 1).slice(0, 30);
+  h += '<h2 class="h-section">אימונים אחרונים</h2><div class="group">';
+  if (!list.length) h += '<div class="empty">עוד לא תועדו אימונים.</div>';
+  for (const x of list) h += `<button class="row" data-act="train-edit" data-id="${esc(x.id)}"><div class="grow"><div class="row-title">${TRAIN_TYPES[x.type] || 'אימון'}${x.min ? ` · ${x.min} דק׳` : ''}</div><div class="row-sub">${fmtDay(parseDT(x.d))}${x.note ? ` — ${esc(x.note)}` : ''}</div></div>${ICON.chev}</button>`;
+  return h + '</div>';
+}
+function openTrainForm(id) {
+  const x = id ? (S.train.items || []).find(q => q.id === id) : null; if (id && !x) return;
+  F = { kind: 'train', id: x ? x.id : null, type: x ? x.type : 'strength' };
+  const body = `<div class="field"><span class="fl">סוג</span><div class="chips" role="group" aria-label="סוג">${Object.entries(TRAIN_TYPES).map(([k, l]) => `<button class="chip" data-pick="type" data-val="${k}" aria-pressed="${F.type === k}">${l}</button>`).join('')}</div></div>
+    <div class="two"><label class="field"><span class="fl">תאריך</span><input type="date" id="f-td" value="${esc(x ? x.d : todayStr())}"></label><label class="field"><span class="fl">כמה דקות</span><input type="number" inputmode="numeric" min="1" max="600" id="f-tm" value="${esc(x ? x.min || '' : 30)}"></label></div>
+    <label class="field"><span class="fl">מה עשית (לא חובה)</span><textarea id="f-tn" maxlength="300" placeholder="למשל: סקוואט 3×10, לחיצת חזה 3×8">${esc(x ? x.note || '' : '')}</textarea></label>`;
+  Sheet.open(x ? 'עריכת אימון' : 'אימון חדש', body, `${x ? '<button class="btn danger" data-act="train-del">מחיקה</button>' : ''}<button class="btn" data-act="train-save">שמירה</button>`);
+}
+function trainSave() {
+  const sh = $('#sheet'), d = $('#f-td', sh).value, min = Math.round(numVal($('#f-tm', sh)));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { toast('בחרו תאריך.', 'alert'); return; }
+  if (d > todayStr()) { toast('אי אפשר לתעד אימון עתידי.', 'alert'); return; }
+  const rec = { d, t: nowHM(), type: TRAIN_TYPES[F.type] ? F.type : 'other', min: min > 0 && min <= 600 ? min : 0, note: ($('#f-tn', sh).value || '').trim().slice(0, 300) }, f = { ...F };
+  if (!mutate('train', tr => { if (!tr.items) tr.items = []; if (f.id) { const x = tr.items.find(q => q.id === f.id); if (x) Object.assign(x, rec, { t: x.t || rec.t }); } else tr.items.push({ id: uid(), ...rec }); tr.items = tr.items.slice(-500); })) return;
+  mutate('daily', dd => { const r = { ...blankDay(), ...(dd.days[d] || {}) }; if (rec.type === 'strength') r.str = true; else if (rec.type !== 'other') r.walk = true; dd.days[d] = r; });
+  Sheet.close(); toast(f.id ? 'האימון עודכן' : 'האימון נשמר 💪');
+}
+function openStepsForm() {
+  F = { kind: 'steps' };
+  Sheet.open('צעדים היום', `<label class="field"><span class="fl">כמה צעדים עשית היום</span><input type="number" inputmode="numeric" min="0" max="100000" id="f-steps" value="${stepsOn(todayStr()) || ''}" placeholder="למשל: 6500" style="font-size:22px"></label><p class="tiny muted">את המספר רואים באפליקציית הבריאות של הטלפון או בשעון.</p>`, '<button class="btn" data-act="steps-save">שמירה</button>');
+}
+
+
+/* ---------- Google Drive: automatic daily backup (active only when the build has a Google client ID) ---------- */
+async function gReq(token, method, url, body, ctype) {
+  const headers = { authorization: 'Bearer ' + token };
+  if (body !== undefined) headers['content-type'] = ctype || 'application/json';
+  const H = Native.plugin('CapacitorHttp');
+  let st = 0, data = null;
+  try {
+    if (H && typeof H.request === 'function') {
+      const r = await H.request({ url, method, headers, data: body, responseType: 'json' }); st = r ? r.status : 0; data = r && r.data;
+      if (typeof data === 'string' && data) { try { data = JSON.parse(data); } catch (e) {} }
+    } else {
+      const r = await fetch(url, { method, headers, body: body === undefined || typeof body === 'string' ? body : JSON.stringify(body) }); st = r.status;
+      const t = await r.text(); try { data = t ? JSON.parse(t) : null; } catch (e) { data = t; }
+    }
+  } catch (e) { throw { code: 'network' }; }
+  if (st === 401 || st === 403) throw { code: 'auth', status: st };
+  if (st < 200 || st >= 300) throw { code: 'drive', status: st };
+  return data;
+}
+const GDrive = {
+  scope: 'https://www.googleapis.com/auth/drive.file', folderName: 'MyShot', tok: null, inited: false,
+  enabled() { return Native.on && !!window.MYSHOT_GOOGLE_WEB_CLIENT_ID; },
+  st() { try { return JSON.parse(localStorage.getItem('mj-gdrive') || '{}') || {}; } catch (e) { return {}; } },
+  save(p) { try { localStorage.setItem('mj-gdrive', JSON.stringify({ ...this.st(), ...p })); } catch (e) {} },
+  connected() { return !!this.st().connected; },
+  async token(interactive) {
+    if (this.tok && this.tok.exp > Date.now() + 60000) return this.tok.token;
+    const SL = Native.plugin('SocialLogin'); if (!SL) throw { code: 'no_plugin' };
+    if (!this.inited) { await SL.initialize({ google: { webClientId: window.MYSHOT_GOOGLE_WEB_CLIENT_ID } }); this.inited = true; }
+    const options = { scopes: [this.scope] };
+    if (!interactive) { options.filterByAuthorizedAccounts = true; options.autoSelectEnabled = true; }
+    let res;
+    try { res = await SL.login({ provider: 'google', options }); }
+    catch (e) { const m = String((e && (e.message || e.code)) || e); throw { code: /cancel/i.test(m) ? 'cancel' : 'auth', detail: m }; }
+    const r = (res && res.result) || {}, at = r.accessToken;
+    if (!at || !at.token) throw { code: 'auth' };
+    this.tok = { token: at.token, exp: Date.parse(at.expires) || Date.now() + 50 * 60000 };
+    this.save({ connected: true, email: (r.profile && r.profile.email) || this.st().email || '' });
+    return at.token;
+  },
+  async folder(tk) {
+    const cur = this.st().folder; if (cur) return cur;
+    const q = encodeURIComponent(`name='${this.folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+    const r = await gReq(tk, 'GET', `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`);
+    let id = r && r.files && r.files[0] && r.files[0].id;
+    if (!id) id = (await gReq(tk, 'POST', 'https://www.googleapis.com/drive/v3/files?fields=id', { name: this.folderName, mimeType: 'application/vnd.google-apps.folder' })).id;
+    this.save({ folder: id }); return id;
+  },
+  async list(tk) {
+    const folder = await this.folder(tk), q = encodeURIComponent(`'${folder}' in parents and trashed=false`);
+    const r = await gReq(tk, 'GET', `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime%20desc&pageSize=50&fields=files(id,name,createdTime,modifiedTime,size)`);
+    return (r && r.files) || [];
+  },
+  // One backup at a time: a second request (say, the automatic one) joins the one already running.
+  backup(interactive) { if (!this.inflight) this.inflight = this.runBackup(interactive).finally(() => { this.inflight = null; }); return this.inflight; },
+  async runBackup(interactive) {
+    const tk = await this.token(interactive);
+    let folder;
+    try { folder = await this.folder(tk); } catch (e) { if (e.code === 'drive' && e.status === 404) { this.save({ folder: null }); folder = await this.folder(tk); } else throw e; }
+    const name = `myshot-backup-${todayStr()}.json`, data = await buildBackupJSON();
+    const q = encodeURIComponent(`name='${name}' and '${folder}' in parents and trashed=false`);
+    const ex = await gReq(tk, 'GET', `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+    let id = ex && ex.files && ex.files[0] && ex.files[0].id;
+    if (!id) id = (await gReq(tk, 'POST', 'https://www.googleapis.com/drive/v3/files?fields=id', { name, parents: [folder], mimeType: 'application/json' })).id;
+    await gReq(tk, 'PATCH', `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`, data, 'application/json');
+    this.save({ last: Date.now(), lastErr: null });
+    try { localStorage.setItem('mj-lastbackup', String(Date.now())); } catch (e) {}
+    try { const files = await this.list(tk); for (const f of files.slice(14)) await gReq(tk, 'DELETE', `https://www.googleapis.com/drive/v3/files/${f.id}`); } catch (e) {}
+    return name;
+  },
+  async download(id) { const tk = await this.token(true), r = await gReq(tk, 'GET', `https://www.googleapis.com/drive/v3/files/${id}?alt=media`); return typeof r === 'string' ? r : JSON.stringify(r); },
+  async auto() {
+    if (!this.enabled() || !this.connected() || this.st().auto === false || this.inflight) return;
+    if (Date.now() - (this.st().last || 0) < 20 * HOUR) return;
+    try { await this.backup(false); } catch (e) { this.save({ lastErr: Date.now() }); }
+  },
+  async disconnect() { try { await Native.plugin('SocialLogin').logout({ provider: 'google' }); } catch (e) {} this.tok = null; try { localStorage.removeItem('mj-gdrive'); } catch (e) {} },
+};
+const driveErr = e => ({ no_plugin: 'רכיב ההתחברות ל-Google לא נכלל בגרסה הזו של האפליקציה.', auth: 'לא הצלחנו להתחבר ל-Google. נסו שוב.', network: 'אין חיבור לאינטרנט. נסו שוב אחר כך.', drive: `Google Drive החזיר שגיאה${e && e.status ? ` (${e.status})` : ''}. נסו שוב.` })[e && e.code] || 'משהו השתבש. נסו שוב.';
+function driveSettingsHTML() {
+  if (!GDrive.enabled()) return '';
+  const s = GDrive.st();
+  if (!GDrive.connected()) return `<div class="group" style="margin-top:12px"><button class="row" data-act="gd-connect"><div class="grow"><div class="row-title">גיבוי אוטומטי ל-Google Drive</div><div class="row-sub">מתחברים פעם אחת, ומשם הגיבוי נשמר כל יום בתיקייה MyShot בדרייב שלך</div></div>${ICON.chev}</button></div>`;
+  const when = s.last ? `${fmtDay(new Date(s.last))}, ${fmtT(new Date(s.last))}` : 'עוד לא';
+  return `<div class="group" style="margin-top:12px">
+    <div class="row"><div class="grow"><div class="row-title">גיבוי אוטומטי ל-Drive</div><div class="row-sub">${s.email ? `<bdi>${esc(s.email)}</bdi> · ` : ''}גיבוי אחרון: ${when}</div></div><button class="sw" role="switch" aria-checked="${s.auto !== false}" aria-label="גיבוי אוטומטי ל-Drive" data-act="gd-auto"></button></div>
+    <div class="row"><div class="chips"><button class="chip" data-act="gd-now">גיבוי עכשיו</button><button class="chip" data-act="gd-restore">שחזור מ-Drive</button><button class="chip out" data-act="gd-off">ניתוק</button></div></div>
+  </div>${s.lastErr && (!s.last || s.lastErr > s.last) ? '<div class="note warn">הגיבוי האוטומטי האחרון לא הצליח. ״גיבוי עכשיו״ יחבר מחדש.</div>' : ''}<p class="tiny muted" style="margin-top:6px">נשמרים 14 הגיבויים האחרונים. לאפליקציה יש גישה רק לקבצים שהיא עצמה יצרה בדרייב.</p>`;
+}
+async function driveRestorePick() {
+  let files;
+  try { files = await GDrive.list(await GDrive.token(true)); } catch (e) { if (e.code !== 'cancel') toast(driveErr(e), 'alert'); return; }
+  const list = files.filter(f => /^myshot-backup-.*\.json$/.test(f.name));
+  F = { kind: 'gdpick' };
+  Sheet.open('שחזור מ-Drive', list.length ? `<p class="lead" style="margin-top:4px">בחרו גיבוי. השחזור מחליף את כל הנתונים הנוכחיים.</p><div class="group">${list.map(f => `<button class="row" data-act="gd-pick" data-id="${esc(f.id)}" data-name="${esc(f.name)}"><div class="grow"><div class="row-title">${fmtDay(new Date(f.modifiedTime || f.createdTime))}</div><div class="row-sub">${fmtT(new Date(f.modifiedTime || f.createdTime))}${f.size ? ` · ${Math.max(1, Math.round(f.size / 1024))} KB` : ''}</div></div>${ICON.chev}</button>`).join('')}</div>` : '<div class="empty">עוד אין גיבויים בתיקייה MyShot בדרייב.</div>', '');
 }
 
 /* ---------- photos through the native camera (Android) ---------- */
@@ -1081,7 +1361,7 @@ function restorePhoto(ev) {
     else openPhotoSheet();
     setTimeout(() => deliverPhoto(kind, blob), 250);
   };
-  if (App.ready) run(); else App.afterReady = run;
+  if (App.ready) Lock.whenOpen(run); else App.afterReady = run;
 }
 // Every photo button goes through the native camera or gallery instead of the web view's file picker.
 document.addEventListener('click', e => {
@@ -1297,7 +1577,7 @@ function customSummary(c) {
 function openRemPage() { if (Sheet.isOpen()) Sheet.close(); App.tab = 'more'; App.more = 'reminders'; App.render(); window.scrollTo(0, 0); }
 function lastBackupText() { try { const t = +localStorage.getItem('mj-lastbackup'); return t ? `${fmtDay(new Date(t))}, ${fmtT(new Date(t))}` : 'עוד לא'; } catch (e) { return 'עוד לא'; } }
 async function backupToDrive() { App.saveTitle = 'שמירה ב-Google Drive'; try { await doExport(); } finally { App.saveTitle = null; } if (App.ready && !Sheet.isOpen()) App.render(); }
-function remActiveCount() { const r = remCfg(); return ['dose', 'follow', 'eve', 'supps', 'water', 'weigh', 'stock', 'backup'].filter(k => r[k] && (k !== 'eve' || curMed().freq === 'weekly')).length + r.custom.filter(c => c.on).length; }
+function remActiveCount() { const r = remCfg(); return ['dose', 'follow', 'eve', 'supps', 'water', 'weigh', 'train', 'stock', 'backup'].filter(k => r[k] && (k !== 'eve' || curMed().freq === 'weekly')).length + r.custom.filter(c => c.on).length; }
 function remindersBody() {
   const r = remCfg(), m = curMed(), t = T(), st = S.core.settings, weekly = m.freq === 'weekly';
   let h = '';
@@ -1308,6 +1588,7 @@ function remindersBody() {
   const chipsSet = (k, opts, cur) => `<div class="chips">${opts.map(([v, l]) => `<button class="chip" data-act="rem-set" data-k="${k}" data-v="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
   const dayChips = (k, cur) => chipsSet(k, DAYS.map((n, i) => [i, DAYS_SHORT[i]]), cur);
   const row = (k, title, sub, extra) => `<div class="row col"><div class="rowline"><div class="grow"><div class="row-title">${title}</div><div class="row-sub">${sub}</div></div>${sw(k, title)}</div>${r[k] && extra ? `<div class="rem-extra">${extra}</div>` : ''}</div>`;
+  h += `<h2 class="h-section">פרטיות</h2><div class="group">${row('discreet', 'התראות דיסקרטיות', r.discreet ? 'במסך הנעילה מופיע רק ״תזכורת מ-MyShot״, בלי שם התרופה או המינון' : 'ההתראות מציגות את שם התרופה, המינון והפרטים', '')}</div>`;
   h += '<h2 class="h-section">תזכורות קבועות</h2><div class="group">';
   h += row('dose', weekly ? `יום ה${t.dose}` : `${t.dose} יומית`, weekly ? (hasDay() ? `כל יום ${DAYS[st.day]}` : 'לפי המנה האחרונה') : esc(m.name),
     timeIn('data-remset="time"', st.time || '09:00', 'שעה') + ((m.timesPerDay || 1) >= 2 && m.freq !== 'meals' ? timeIn('data-rem="time2"', r.time2, 'מנה שנייה') : ''));
@@ -1316,6 +1597,7 @@ function remindersBody() {
   h += row('supps', 'תוספים', 'לפי השעות של כל ארוחה ביום', `<div class="rem-times">${SLOT_ORDER.map(sl => timeIn(`data-rem="slots.${sl}"`, r.slots[sl], SLOTS[sl])).join('')}</div>`);
   h += row('water', 'מים', `מתוך יעד של ${st.water || 8} כוסות`, `<div class="rem-times">${timeIn('data-rem="water_.from"', r.water_.from, 'מ-')}${timeIn('data-rem="water_.to"', r.water_.to, 'עד')}</div><p class="tiny muted" style="margin:8px 0">כל כמה שעות</p>${chipsSet('water_.every', [[1, 'שעה'], [2, 'שעתיים'], [3, '3'], [4, '4']], r.water_.every)}`);
   h += row('weigh', 'שקילה שבועית', `ביום ${DAYS[r.weighDay]}`, dayChips('weighDay', r.weighDay) + `<div style="margin-top:10px">${timeIn('data-rem="weighTime"', r.weighTime, 'שעה')}</div>`);
+  h += row('train', 'אימון', r.train ? `בימי ${(r.trainDays || []).map(i => DAYS_SHORT[i]).join(', ')} בשעה ${r.slots.workout}` : 'תזכורת לאימון בימים שבוחרים', `<div class="chips">${DAYS.map((n, i) => `<button class="chip" data-act="rem-tday" data-v="${i}" aria-pressed="${(r.trainDays || []).includes(i)}">${DAYS_SHORT[i]}</button>`).join('')}</div><div style="margin-top:10px">${timeIn('data-rem="slots.workout"', r.slots.workout, 'שעה')}</div>`);
   h += row('stock', 'מלאי', 'כשהמלאי נמוך, או כשעט עומד לפוג', '');
   h += row('backup', 'גיבוי שבועי', `ביום ${DAYS[r.backupDay]}, עם כפתור ״גיבוי עכשיו״`, dayChips('backupDay', r.backupDay) + `<div style="margin-top:10px">${timeIn('data-rem="backupTime"', r.backupTime, 'שעה')}</div>`);
   h += '</div>';
@@ -1448,8 +1730,8 @@ async function nativeBoot() {
       });
       AP.addListener('appRestoredResult', ev => { try { restorePhoto(ev); } catch (e) {} });
       AP.addListener('appStateChange', st => {
-        if (st && st.isActive) { nativeBars(); syncThemeBtn(); if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
-        else Sync.flushAll();
+        if (st && st.isActive) { const lc = Lock.cfg(); if (Lock.on() && !Lock.locked && Date.now() - Lock.bgAt >= ((lc && lc.after) || 0) * 1000) Lock.show(); GDrive.auto(); nativeBars(); syncThemeBtn(); if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
+        else { Lock.bgAt = Date.now(); Sync.flushAll(); }
       });
     } catch (e) {}
   }
@@ -1461,7 +1743,7 @@ async function nativeBoot() {
 
 /* ================= state & storage ================= */
 const DEF = {
-  core: { settings: { day: null, time: '09:00', start: null, dose: 2.5, perPen: 4, arms: false, water: 8, protein: 0, kcal: 0, fiber: 0, height: null, goalKg: null, setup: false, med: 'mounjaro', customMed: null }, pen: { opened: null, used: 0, spare: 0 }, supps: [], questions: [], favs: [], customSyms: [], plan: [] },
+  core: { settings: { day: null, time: '09:00', start: null, dose: 2.5, perPen: 4, arms: false, water: 8, protein: 0, kcal: 0, fiber: 0, height: null, goalKg: null, setup: false, med: 'mounjaro', customMed: null, trainGoal: 2, stepGoal: 7000 }, pen: { opened: null, used: 0, spare: 0 }, supps: [], questions: [], favs: [], customSyms: [], plan: [] },
   injections: { items: [] },
   symptoms: { items: [] },
   weights: { items: [] },
@@ -1469,6 +1751,7 @@ const DEF = {
   daily: { days: {} },
   food: { days: {} },
   photos: { items: [] },
+  train: { items: [] },
 };
 const KEYS = Object.keys(DEF);
 let S = clone(DEF);
@@ -2143,10 +2426,11 @@ function viewHome() {
       <div class="faces">${faces.map((f, i) => `<button class="face" data-act="feel" data-n="${i + 1}" aria-pressed="${r.f === i + 1}" aria-label="${faceL[i]}">${f}</button>`).join('')}</div>
     </div>
     <div class="row col">
+      <div class="rowline"><span class="row-title">פעילות</span><span class="row-sub num">כוח השבוע: ${trainStats().strength} מתוך ${S.core.settings.trainGoal || 2}</span></div>
       <div class="chips">
+        <button class="chip" data-act="log-train">${ICON.plus}אימון</button>
+        <button class="chip out" data-act="steps-edit">${stepsOn(todayStr()) ? `${nfi(stepsOn(todayStr()))} צעדים` : 'צעדים היום'}</button>
         <button class="chip" data-act="habit" data-k="bm" aria-pressed="${!!r.bm}">הייתה יציאה</button>
-        <button class="chip" data-act="habit" data-k="walk" aria-pressed="${!!r.walk}">הליכה או אירובי</button>
-        <button class="chip" data-act="habit" data-k="str" aria-pressed="${!!r.str}">אימון כוח</button>
       </div>
     </div>
     <button class="row add" data-act="log-sym">${ICON.plus}<span class="grow">תיעוד תופעת לוואי</span>${ICON.chev}</button>
@@ -2441,8 +2725,9 @@ function allSymHTML() {
   return h + '</div>';
 }
 function viewTrack() {
-  let h = banners() + pageTitle('מעקב') + segsHTML('track', [['summary', 'סיכום'], ['symptoms', 'תופעות לוואי'], ['body', 'גוף']], App.trackSeg);
+  let h = banners() + pageTitle('מעקב') + segsHTML('track', [['summary', 'סיכום'], ['symptoms', 'תופעות'], ['body', 'גוף'], ['train', 'אימונים']], App.trackSeg);
   if (App.trackSeg === 'symptoms') h += `<button class="btn block" style="margin-top:14px" data-act="log-sym">תיעוד תופעת לוואי</button>` + (curMed().freq === 'weekly' ? patternHTML() : '') + trendHTML() + last30HTML() + allSymHTML();
+  else if (App.trackSeg === 'train') h += trainHTML();
   else if (App.trackSeg === 'body') h += `<button class="btn block" style="margin-top:14px" data-act="log-weight">תיעוד שקילה</button>` + weightHTML() + photosHTML();
   else h += periodHTML() + streaksHTML();
   return h;
@@ -2479,7 +2764,7 @@ function viewMore() {
 }
 function openQuick() {
   F = { kind: 'quick' };
-  const items = [['log-inj', T().pen ? ICON.syr : ICON.pill, T().dose], canOCR() ? ['log-meal', ICON.cam, 'צילום ארוחה', 'photo'] : null, ['log-meal', ICON.bowl, 'ארוחה'], ['go-supps', ICON.pill, 'תוספים'], canOCR() ? ['supp-photo', ICON.cam, 'צילום תוסף'] : null, ['log-sym', ICON.pulse, 'תופעת לוואי'], ['log-weight', ICON.scale, 'שקילה'], ['add-receipt', ICON.rcpt, 'קבלה'], ['photo-add', ICON.img, 'תמונת התקדמות'], ['q-add', ICON.q, 'שאלה לרופא']].filter(Boolean);
+  const items = [['log-inj', T().pen ? ICON.syr : ICON.pill, T().dose], canOCR() ? ['log-meal', ICON.cam, 'צילום ארוחה', 'photo'] : null, ['log-meal', ICON.bowl, 'ארוחה'], ['go-supps', ICON.pill, 'תוספים'], ['log-train', ICON.pulse, 'אימון'], canOCR() ? ['supp-photo', ICON.cam, 'צילום תוסף'] : null, ['log-sym', ICON.pulse, 'תופעת לוואי'], ['log-weight', ICON.scale, 'שקילה'], ['add-receipt', ICON.rcpt, 'קבלה'], ['photo-add', ICON.img, 'תמונת התקדמות'], ['q-add', ICON.q, 'שאלה לרופא']].filter(Boolean);
   Sheet.open('מה לתעד?', `<div class="qa">${items.map(([act, ic, l, mode], i) => `<button class="${i === 0 ? 'primary' : ''}" data-act="${act}"${mode ? ` data-mode="${mode}"` : ''}>${ic}<span>${l}</span></button>`).join('')}</div>`);
 }
 
@@ -3509,7 +3794,7 @@ function openSettings() {
     <h3 class="h-sub" style="margin-top:4px">התרופה</h3>
     <div>${medChipsHTML(F.med)}</div>
     <div id="f-medblock">${medBlockHTML(false)}</div>
-    ${Native.on ? `<h3 class="h-sub" style="margin-top:26px">תזכורות</h3><div class="group"><button class="row" data-act="rem-page">${icoBell()}<div class="grow"><div class="row-title">ניהול התזכורות</div><div class="row-sub">מה מזכירים, באיזו שעה, ותזכורות משלכם</div></div>${ICON.chev}</button></div>` : ''}${BYOK_ON ? aiSettingsHTML() : ''}
+    ${Native.on ? `<h3 class="h-sub" style="margin-top:26px">תזכורות</h3><div class="group"><button class="row" data-act="rem-page">${icoBell()}<div class="grow"><div class="row-title">ניהול התזכורות</div><div class="row-sub">מה מזכירים, באיזו שעה, ותזכורות משלכם</div></div>${ICON.chev}</button></div>` : ''}${BYOK_ON ? aiSettingsHTML() : ''}${lockSettingsHTML()}
     <h3 class="h-sub" style="margin-top:26px">יעדים</h3>
     <div class="two"><label class="field"><span class="fl">מים (כוסות ביום)</span><input type="number" inputmode="numeric" min="1" max="20" id="f-water" value="${esc(st.water || 8)}"></label><label class="field"><span class="fl">חלבון (גרם ביום)</span><input type="number" inputmode="numeric" min="0" max="300" id="f-protein" value="${st.protein ? esc(st.protein) : ''}" placeholder="לא נקבע"></label></div>
     <div class="two"><label class="field"><span class="fl">קלוריות ביום</span><input type="number" inputmode="numeric" min="0" max="6000" id="f-kcal" value="${st.kcal ? esc(st.kcal) : ''}" placeholder="לא נקבע"></label><label class="field"><span class="fl">סיבים (גרם ביום)</span><input type="number" inputmode="numeric" min="0" max="100" id="f-fiber" value="${st.fiber ? esc(st.fiber) : ''}" placeholder="לא נקבע"></label></div>
@@ -3517,7 +3802,7 @@ function openSettings() {
     <div class="field"><span class="fl">מראה</span><div class="chips" role="group" aria-label="מראה"><button class="chip" data-pick="theme" data-val="auto" aria-pressed="${F.theme === 'auto'}">לפי המכשיר</button><button class="chip" data-pick="theme" data-val="light" aria-pressed="${F.theme === 'light'}">בהיר</button><button class="chip" data-pick="theme" data-val="dark" aria-pressed="${F.theme === 'dark'}">כהה</button></div></div>
     <h3 class="h-sub" style="margin-top:26px">גיבוי ונתונים</h3>
     <p class="small muted">${storage}</p>
-    ${Native.on ? `<div class="chips" style="margin-top:12px"><button class="chip" data-act="backup-drive">${icoCloud()} גיבוי ל-Google Drive</button></div><p class="tiny muted" style="margin-top:8px">נפתח חלון השיתוף של אנדרואיד: בוחרים Drive ואת התיקייה. כדי לשחזר, לוחצים ״שחזור מגיבוי״ ובוחרים את הקובץ מתוך Drive. גיבוי אחרון: ${lastBackupText()}.</p>` : ''}<div class="chips" style="margin-top:12px">${App.downloads ? `<button class="chip" data-act="export">${Native.on ? 'ייצוא לקובץ' : 'ייצוא גיבוי'}</button>` : ''}<label class="chip file-btn">${Native.on ? 'שחזור מגיבוי' : 'ייבוא גיבוי'}<input type="file" accept="application/json,.json" data-file="import"></label><button class="chip out" style="color:var(--alert)" data-act="wipe">מחיקת כל הנתונים</button></div>
+    ${driveSettingsHTML()}${Native.on ? `<div class="chips" style="margin-top:12px"><button class="chip" data-act="backup-drive">${icoCloud()} גיבוי ל-Google Drive</button></div><p class="tiny muted" style="margin-top:8px">נפתח חלון השיתוף של אנדרואיד: בוחרים Drive ואת התיקייה. כדי לשחזר, לוחצים ״שחזור מגיבוי״ ובוחרים את הקובץ מתוך Drive. גיבוי אחרון: ${lastBackupText()}.</p>` : ''}<div class="chips" style="margin-top:12px">${App.downloads ? `<button class="chip" data-act="export">${Native.on ? 'ייצוא לקובץ' : 'ייצוא גיבוי'}</button>` : ''}<label class="chip file-btn">${Native.on ? 'שחזור מגיבוי' : 'ייבוא גיבוי'}<input type="file" accept="application/json,.json" data-file="import"></label><button class="chip out" style="color:var(--alert)" data-act="wipe">מחיקת כל הנתונים</button></div>
     <p class="disclaimer" style="margin-top:20px">המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי.</p>
     <button class="credit-line" data-act="about">MyShot · גרסה ${APP_VERSION} · פותח על ידי רן יעקבי</button>`;
   Sheet.open('הגדרות', body, '<button class="btn" data-act="set-save">שמירת ההגדרות</button>', sh => {
@@ -3687,6 +3972,7 @@ function buildSummary() {
   const qs = S.core.questions.filter(q => !q.done);
   if (qs.length) { L.push('', 'שאלות לרופא:'); qs.forEach(q => L.push(`- ${q.q}`)); }
   L.push('', 'הסיכום נוצר מהנתונים שתועדו ביומן.');
+    { const t14 = (S.train.items || []).filter(x => x.d >= toDateStr(addDays(startOfDay(new Date()), -13))); if (t14.length) { let sum = 0, n = 0; for (let i = 0; i < 14; i++) { const v = stepsOn(toDateStr(addDays(startOfDay(new Date()), -i))); if (v) { sum += v; n++; } } L.push('', 'פעילות ב-14 הימים האחרונים', `אימוני כוח: ${t14.filter(x => x.type === 'strength').length}, אימונים אחרים: ${t14.filter(x => x.type !== 'strength').length}${n ? `, צעדים בממוצע ליום: ${Math.round(sum / n)}` : ''}`); } }
   return L.join('\n');
 }
 function openSummary() {
@@ -3713,14 +3999,14 @@ async function saveFile(filename, data, okMsg) {
 }
 
 /* ---------- backup ---------- */
-async function doExport() {
+async function buildBackupJSON() {
   const images = {};
   for (const r of S.receipts.items) if (r.img) { const src = imgCache.get(r.img) || ((await Backend.getImg(r.img)) || {}).src; if (typeof src === 'string') images[r.img] = src; }
   const photos = {};
   for (const x of S.photos.items) { const src = await loadPhoto(x.id); const th = thumbCache.get(x.id) || ((await Backend.getBlob('pt-' + x.id)) || {}).src; if (src) photos[x.id] = { src, thumb: typeof th === 'string' ? th : '' }; }
-  const data = JSON.stringify({ app: 'mounjaro-journal', v: 2, appVersion: APP_VERSION, exported: new Date().toISOString(), docs: clone(S), images, photos });
-  await saveFile(`myshot-backup-${todayStr()}.json`, data, 'הגיבוי נשמר');
+  return JSON.stringify({ app: 'mounjaro-journal', v: 2, appVersion: APP_VERSION, exported: new Date().toISOString(), docs: clone(S), images, photos });
 }
+async function doExport() { await saveFile(`myshot-backup-${todayStr()}.json`, await buildBackupJSON(), 'הגיבוי נשמר'); }
 async function doImport(file) {
   if (!file) return;
   let data;
@@ -4176,7 +4462,7 @@ function openReport() {
 }
 
 /* ================= events & boot ================= */
-const ROUTES = { home: ['home'], shots: ['shots'], food: ['food', 'meals'], meals: ['food', 'meals'], supps: ['food', 'supps'], track: ['track'], journal: ['track', 'summary'], summary: ['track', 'summary'], symptoms: ['track', 'symptoms'], weight: ['track', 'body'], body: ['track', 'body'], more: ['more', null], receipts: ['more', 'receipts'], guide: ['more', 'guide'], doctor: ['more', 'doctor'] };
+const ROUTES = { train: ['track', 'train'], home: ['home'], shots: ['shots'], food: ['food', 'meals'], meals: ['food', 'meals'], supps: ['food', 'supps'], track: ['track'], journal: ['track', 'summary'], summary: ['track', 'summary'], symptoms: ['track', 'symptoms'], weight: ['track', 'body'], body: ['track', 'body'], more: ['more', null], receipts: ['more', 'receipts'], guide: ['more', 'guide'], doctor: ['more', 'doctor'] };
 function setTab(t, fromBar) {
   const r = ROUTES[t]; if (!r) return;
   const [tab, sub] = r;
@@ -4317,6 +4603,26 @@ document.addEventListener('click', e => {
     case 'ai-models-refresh': { const k = ((($('#f-akey') || {}).value) || '').trim() || AIKeys.read().keys[F.aiProv]; if (k) refreshAIModels(F.aiProv, k, false); break; }
     case 'rem-page': openRemPage(); break;
     case 'theme-toggle': toggleTheme(a); break;
+    case 'gd-connect': case 'gd-now': { const first = d.act === 'gd-connect'; a.disabled = true; GDrive.backup(true).then(() => { toast(first ? 'מחובר. הגיבוי הראשון נשמר ב-Drive ✓' : 'הגיבוי נשמר ב-Drive ✓'); if (F.kind === 'set') openSettings(); }).catch(e => { a.disabled = false; if (e.code !== 'cancel') toast(driveErr(e), 'alert'); }); break; }
+    case 'gd-auto': { const on = GDrive.st().auto === false; GDrive.save({ auto: on }); a.setAttribute('aria-checked', String(on)); break; }
+    case 'gd-restore': driveRestorePick(); break;
+    case 'gd-pick': { const id = d.id, name = d.name; GDrive.download(id).then(t => doImport(new File([t], name, { type: 'application/json' }))).catch(e => { if (e.code !== 'cancel') toast(driveErr(e), 'alert'); }); break; }
+    case 'gd-off': GDrive.disconnect().then(() => { toast('Drive נותק'); if (F.kind === 'set') openSettings(); }); break;
+    case 'log-train': Sheet.close(); setTimeout(() => openTrainForm(), Sheet.isOpen() ? 200 : 0); break;
+    case 'train-edit': openTrainForm(d.id); break;
+    case 'train-save': trainSave(); break;
+    case 'train-del': { const id = F.id; if (mutate('train', tr => { tr.items = (tr.items || []).filter(x => x.id !== id); })) { Sheet.close(); toast('האימון נמחק'); } break; }
+    case 'train-goal': { const v = +d.v; mutate('core', c => { c.settings.trainGoal = v; }); break; }
+    case 'step-goal': { const v = +d.v; mutate('core', c => { c.settings.stepGoal = v; }); break; }
+    case 'steps-edit': openStepsForm(); break;
+    case 'steps-save': { const v = Math.round(numVal($('#f-steps'))); if (!(v >= 0 && v <= 100000)) { toast('מספר לא תקין', 'alert'); break; } setDay(r => { r.steps = v; }); Sheet.close(); toast('הצעדים נשמרו'); break; }
+    case 'rem-tday': { const v = +d.v; remSave(r => { const cur = r.trainDays || []; r.trainDays = cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v].sort((p, q) => p - q); }); break; }
+    case 'lock-toggle': if (Lock.on()) { Sheet.close(); Lock.whenOpen(() => {}); (async () => { const c = Lock.cfg(); if (c && c.bio && await Bio.auth()) { Lock.off(); toast('הנעילה בוטלה'); return; } F = { kind: 'pinoff' }; Sheet.open('ביטול הנעילה', '<p class="lead" style="margin-top:4px">הקלידו את הקוד הנוכחי</p><label class="field"><input type="password" inputmode="numeric" maxlength="6" id="f-pin" dir="ltr" style="text-align:center;font-size:26px;letter-spacing:.4em"></label><div id="pin-err"></div>', '<button class="btn danger" data-act="pin-off">ביטול הנעילה</button>'); })(); } else openPinSheet('new'); break;
+    case 'pin-next': pinNext(); break;
+    case 'pin-off': { const v = (($('#f-pin') || {}).value || '').trim(); Lock.check(v).then(ok => { if (ok) { Lock.off(); Sheet.close(); toast('הנעילה בוטלה'); } else $('#pin-err').innerHTML = '<div class="note warn">קוד שגוי</div>'; }); break; }
+    case 'lock-change': Sheet.close(); setTimeout(() => openPinSheet('change'), 200); break;
+    case 'lock-after': { const v = +d.v; Lock.patch({ after: v }); a.parentElement.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(+c.dataset.v === v))); break; }
+    case 'lock-bio': { const c = Lock.cfg(), want = !(c && c.bio); if (!want) { Lock.patch({ bio: false }); a.setAttribute('aria-checked', 'false'); break; } Bio.available().then(async ok => { if (!ok) { toast('אין בטלפון טביעת אצבע או נעילת מסך שאפשר להשתמש בהן.', 'alert'); return; } if (await Bio.auth()) { Lock.patch({ bio: true }); a.setAttribute('aria-checked', 'true'); toast('פתיחה בטביעת אצבע פועלת'); } }); break; }
     case 'about': openAbout(); break;
     case 'about-ver': { const log = document.getElementById('about-log'); if (log) { log.hidden = !log.hidden; a.setAttribute('aria-expanded', String(!log.hidden)); } break; }
     case 'egg': eggTap(a); break;
@@ -4347,7 +4653,7 @@ document.addEventListener('click', e => {
     case 'ai-setup': openSettings(); setTimeout(() => { const h = Array.from(document.querySelectorAll('#sheet h3')).find(x => x.textContent.includes('בינה מלאכותית')); if (h) h.scrollIntoView({ block: 'start' }); }, 80); break;
     case 'cnt': { F.count = Math.max(1, Math.min(10, (+F.count || 1) + +d.n)); const el = $('#f-cnt'); if (el) el.textContent = F.count; break; }
     case 'go-supps': Sheet.close(); setTab('supps'); break;
-    case 'seg': if (d.g === 'food' && (d.k === 'meals' || d.k === 'supps')) App.foodSeg = d.k; if (d.g === 'track' && ['summary', 'symptoms', 'body'].includes(d.k)) App.trackSeg = d.k; App.render(); window.scrollTo(0, 0); break;
+    case 'seg': if (d.g === 'food' && (d.k === 'meals' || d.k === 'supps')) App.foodSeg = d.k; if (d.g === 'track' && ['summary', 'symptoms', 'body', 'train'].includes(d.k)) App.trackSeg = d.k; App.render(); window.scrollTo(0, 0); break;
     case 'more-go': { App.more = d.k || null; App.tab = 'more'; if (d.open) App.openGuide.add(d.open); App.render(); window.scrollTo(0, 0); if (d.open) setTimeout(() => { const el = document.getElementById(d.open); if (el) el.scrollIntoView({ block: 'start' }); }, 30); break; }
   }
 });
@@ -4414,6 +4720,8 @@ async function boot() {
   window.addEventListener('pagehide', () => Sync.flushAll());
   setInterval(() => { if (App.ready && !Sheet.isOpen()) App.render(); }, 5 * 60 * 1000);
   initOptional();
+  if (Lock.on()) Lock.show();
+  setTimeout(() => GDrive.auto(), 5000);
   syncThemeBtn();
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => syncThemeBtn(true)); } catch (e) {}
   AIKeys.setup();
@@ -4423,7 +4731,7 @@ async function boot() {
     if (App.ready) return;
     App.ready = true; App.render();
     if (Native.on) { Reminders.flush(); Reminders.soon(800); }
-    if (App.afterReady) { const f = App.afterReady; App.afterReady = null; setTimeout(f, 300); }
+    if (App.afterReady) { const f = App.afterReady; App.afterReady = null; setTimeout(() => Lock.whenOpen(f), 300); }
     if (Backend.loaded.core && !S.core.settings.setup && !App.readOnly && !App.slow) setTimeout(() => { if (!Sheet.isOpen()) openOnboarding(); }, 300);
   };
   if (Backend.mode === 'cloud') Backend.startCloud(done);

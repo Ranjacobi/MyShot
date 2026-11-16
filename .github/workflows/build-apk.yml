@@ -9,7 +9,25 @@ permissions:
   contents: write
 
 jobs:
+  # Automated checks: the app runs in headless Chromium with the Android plugins and the
+  # AI/Google services mocked. If any check fails, the APK is not built.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Playwright
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet playwright
+          .venv/bin/python -m playwright install --with-deps chromium
+
+      - name: Run the checks
+        run: .venv/bin/python tests/run_tests.py
+
   apk:
+    needs: test
     runs-on: ubuntu-latest
     env:
       KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -30,6 +48,16 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      # Automatic Drive backup: only when the repository variable GOOGLE_WEB_CLIENT_ID is set
+      # (Settings → Secrets and variables → Actions → Variables). Without it the build is unchanged.
+      - name: Google sign-in for Drive backup (optional)
+        if: ${{ vars.GOOGLE_WEB_CLIENT_ID != '' }}
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          npm install @capgo/capacitor-social-login@^8
+          printf "window.MYSHOT_GOOGLE_WEB_CLIENT_ID = '%s';\n" "$GOOGLE_WEB_CLIENT_ID" > www/google-config.js
 
       - name: Create the Android project
         run: |

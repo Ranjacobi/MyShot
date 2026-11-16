@@ -61,3 +61,54 @@ if (fs.existsSync(vars)) {
   if (v && v < 36) console.warn(`⚠ targetSdkVersion = ${v}. Google Play דורש 36 ומעלה. עדכנו ב-android/variables.gradle.`);
   else if (v) console.log(`✓ targetSdkVersion = ${v}`);
 }
+
+// 7. Google sign-in for the Drive backup (only when the build installed @capgo/capacitor-social-login).
+//    Asking Google for the Drive scope needs MainActivity to hand activity results to the plugin.
+if (fs.existsSync(path.join(root, 'node_modules', '@capgo', 'capacitor-social-login', 'package.json'))) {
+  const found = [];
+  const walk = d => { if (!fs.existsSync(d)) return; for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name === 'MainActivity.java') found.push(p); } };
+  walk(path.join(root, 'android', 'app', 'src', 'main', 'java'));
+  for (const file of found) {
+    const src = fs.readFileSync(file, 'utf8');
+    if (src.includes('ModifiedMainActivityForSocialLoginPlugin')) { console.log('✓ MainActivity already set up for Google sign-in'); continue; }
+    const pkg = (src.match(/^package\s+([\w.]+);/m) || [])[1];
+    if (!pkg) { console.warn('⚠ MainActivity.java has no package line; Google sign-in setup skipped'); continue; }
+    fs.writeFileSync(file, `package ${pkg};
+
+import android.content.Intent;
+import android.util.Log;
+import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginHandle;
+import ee.forgr.capacitor.social.login.GoogleProvider;
+import ee.forgr.capacitor.social.login.ModifiedMainActivityForSocialLoginPlugin;
+import ee.forgr.capacitor.social.login.SocialLoginPlugin;
+
+public class MainActivity extends BridgeActivity implements ModifiedMainActivityForSocialLoginPlugin {
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode >= GoogleProvider.REQUEST_AUTHORIZE_GOOGLE_MIN && requestCode < GoogleProvider.REQUEST_AUTHORIZE_GOOGLE_MAX) {
+            PluginHandle pluginHandle = getBridge().getPlugin("SocialLogin");
+            if (pluginHandle == null) {
+                Log.i("Google Activity Result", "SocialLogin login handle is null");
+                return;
+            }
+            Plugin plugin = pluginHandle.getInstance();
+            if (!(plugin instanceof SocialLoginPlugin)) {
+                Log.i("Google Activity Result", "SocialLogin plugin instance is not SocialLoginPlugin");
+                return;
+            }
+            ((SocialLoginPlugin) plugin).handleGoogleLoginIntent(requestCode, data);
+        }
+    }
+
+    // Never called: it only marks that this MainActivity was set up for the plugin.
+    @Override
+    public void IHaveModifiedTheMainActivityForTheUseWithSocialLoginPlugin() {}
+}
+`);
+    console.log('✓ MainActivity set up for Google sign-in (Drive backup)');
+  }
+}

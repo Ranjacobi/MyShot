@@ -16,10 +16,11 @@ Personal tracker for weight-loss medications: doses, reminders, nutrition, suppl
 - **Nutrition.** Log meals from a photo (camera or gallery), a nutrition label, free text or by hand. The AI's estimates stay editable item by item, and a retake replaces the last detection. Save recipes, and track daily protein, fiber, calories and water.
 - **Supplements.** Photograph a supplement and the AI reads the label: what it contributes, how it fits weight loss and your medication, the label dose, and when to take it, including around a workout. The app adds its own safety checks on top: fat burners and stimulants, laxatives and diuretics, St. John's wort, spacing for fiber and for calcium with iron, and the 30-minute wait after empty-stomach pills. It then joins your schedule with reminders, and logging a meal reminds you of the supplements that go with it. Stock tracking, and protein shakes count toward daily protein.
 - **Tracking.** Side effects by day of the injection cycle, weight and BMI, progress photos with side-by-side comparison, and 7- and 30-day summaries.
+- **Training and steps.** Log strength, cardio and walks, see strength sessions against a weekly goal (strength training helps keep muscle while losing weight), and track daily steps with a 7-day chart. Optional workout reminders on the days you choose.
 - **Receipts.** Photograph a receipt and, with an AI key, the date, amount, vendor and category fill in automatically.
 - **For the doctor.** A PDF report, a text summary and a list of questions for the next visit.
 - **Light and dark.** Follows the phone's setting, or switch in one tap with the sun/moon button in the header.
-- **Private.** All data stays on the phone. Back up to Google Drive in one tap and restore from it later. Backups and reports leave only through the Android share sheet.
+- **Private.** All data stays on the phone. Notifications are discreet by default: the lock screen shows only "MyShot", never the medication or dose. An optional app lock with a PIN and fingerprint (or the phone's screen lock). Backups go to Google Drive automatically once a day, or through the share sheet.
 
 ## Get the APK
 
@@ -68,7 +69,26 @@ Manage them on the **עוד → תזכורות** screen: switch each type on or 
 
 ## Backup to Google Drive
 
-**Settings → גיבוי ל-Google Drive** opens the Android share sheet with a backup file; choose Drive and a folder. To restore, tap **שחזור מגיבוי** and pick the file from Drive. Turn on the weekly backup reminder on the reminders screen, and its **גיבוי עכשיו** button does the same in one tap.
+There are two ways, and both restore through **Settings → שחזור מגיבוי** or **שחזור מ-Drive**.
+
+**Share sheet (works out of the box).** **Settings → גיבוי ל-Google Drive** opens the Android share sheet with a backup file; choose Drive and a folder. The weekly backup reminder on the reminders screen has a **גיבוי עכשיו** button that does the same.
+
+**Automatic daily backup (one-time setup).** The app signs in to your Google account once and then saves a backup every day to a **MyShot** folder in your Drive, silently, when you open the app. It keeps the last 14 backups and can only see files it created itself (the `drive.file` permission). This part is added to the build only after you set it up; until then builds are unchanged.
+
+1. In [Google Cloud Console](https://console.cloud.google.com), create a project (for example *MyShot*).
+2. **APIs & Services → Library**: enable **Google Drive API**.
+3. **Google Auth Platform**: set the app name and support email, choose **External**, add your Gmail address under **Audience → Test users**, and add the scope `.../auth/drive.file` under **Data access**.
+4. **Clients → Create client → Web application**. Copy its client ID (it ends with `.apps.googleusercontent.com`).
+5. **Clients → Create client → Android**: package name `com.itranstudios.myshot`, SHA-1 `7C:C8:3B:70:05:C6:7E:AA:49:55:CC:77:B9:F9:46:EE:B9:41:01:61` (the key that signs the APKs from GitHub Actions). If you later build a signed release or publish to Google Play, add another Android client with that key's SHA-1 too (for Play, the App signing key from Play Console → App integrity).
+6. In this repository: **Settings → Secrets and variables → Actions → Variables → New repository variable**, name `GOOGLE_WEB_CLIENT_ID`, value: the **Web** client ID from step 4 (not the Android one).
+7. Run the workflow again (any push, or **Actions → Run workflow**), install the new APK, and in the app tap **Settings → גיבוי אוטומטי ל-Google Drive**.
+
+While the consent screen is in *Testing*, Google may ask you to sign in again from time to time; if the automatic backup stops, tap **גיבוי עכשיו** to reconnect. Google Cloud changes can take a few hours to apply.
+
+## App lock and discreet notifications
+
+- **Discreet notifications** are on by default (reminders screen → פרטיות). Notifications use private channels, so on a secured lock screen Android hides their content, and the text never names the medication or dose.
+- **App lock** (Settings → נעילת אפליקציה) is optional: a 4–6 digit PIN, stored only as a salted hash, plus fingerprint or the phone's screen lock if you turn it on. Lock immediately, after a minute or after 5 minutes. A notification tapped while locked waits until you unlock. If you forget the PIN and fingerprint is off, the only way back in is clearing the app's data, so keep a backup.
 
 ## AI features (optional)
 
@@ -102,6 +122,12 @@ Google Play needs an AAB signed with your own upload key, and new apps must targ
 3. From the next run, **Artifacts** also has **MyShot-release** with a signed APK and AAB.
 
 Never commit the release keystore; `.gitignore` already excludes `*.jks`. The package ID is `com.itranstudios.myshot`. To change it, edit `capacitor.config.json` before the first Play upload, because it can't change afterwards.
+
+## Automated checks
+
+Every push first runs `tests/run_tests.py` in GitHub Actions (the **test** job): the app loads in headless Chromium with the Android plugins, AI providers and Google Drive mocked, and 18 checks cover reminders and discreet notifications, logging a dose from a notification (and the duplicate-dose guard), the back button, backup and restore, receipt and meal recognition, the model list and fallback, supplement scanning and its safety rules, the meal-to-supplement prompt, the app lock, training and steps, Drive backup and retention, and layout at 360 px. **The APK is built only if every check passes**, so an update that breaks something never reaches the phone.
+
+To run them on your computer: `python3 -m pip install playwright && python3 -m playwright install chromium && python3 tests/run_tests.py`
 
 ## Version
 

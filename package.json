@@ -1,6 +1,6 @@
 {
   "name": "myshot",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "MyShot – מעקב טיפול בתרופות להרזיה, תזונה ותוספים",
   "scripts": {
@@ -10,6 +10,7 @@
     "build:apk": "bash build-apk.sh"
   },
   "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "@capacitor/android": "^8.4.0",
     "@capacitor/app": "^8.0.0",
     "@capacitor/camera": "^8.0.0",
