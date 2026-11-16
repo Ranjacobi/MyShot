@@ -67,11 +67,17 @@ Manage them on the **עוד → תזכורות** screen: switch each type on or 
 - On Android 14+, exact-time alarms need extra approval. Settings has a button for it; without it, Android may delay a reminder by a few minutes.
 - Some manufacturers stop notifications from apps they consider idle. If reminders don't arrive, exclude MyShot from battery optimization.
 
+## First launch
+
+A new install opens with three choices: **שחזור מ-Google Drive** (sign in, and the app finds its latest backup in your Drive and restores it), **בחירת קובץ גיבוי** (pick a backup file from the phone, Drive or anywhere else), or **להתחיל מחדש** (the short medication setup). Nothing is replaced without asking, and a new install has nothing to replace, so the restore runs straight away. Right after the restore or the setup, the app offers once to lock itself with fingerprint or a code; **לא עכשיו** skips it, and it can be set later in Settings → פרטיות ונעילה.
+
+The automatic Drive search sees only backups the app saved itself (the daily Drive backup), because of the `drive.file` permission, and it works once the Google setup below is done. Until then, the Drive button opens the file picker, where Drive is one of the sources. A backup saved through the share sheet is chosen with **בחירת קובץ גיבוי**.
+
 ## Backup to Google Drive
 
 There are two ways, and both restore through **Settings → שחזור מגיבוי** or **שחזור מ-Drive**.
 
-**Share sheet (works out of the box).** **Settings → גיבוי ל-Google Drive** opens the Android share sheet with a backup file; choose Drive and a folder. The weekly backup reminder on the reminders screen has a **גיבוי עכשיו** button that does the same.
+**Share sheet (works out of the box).** **Settings → גיבוי ונתונים → גיבוי ל-Google Drive** opens the Android share sheet with a backup file; choose Drive and a folder. The weekly backup reminder on the reminders screen has a **גיבוי עכשיו** button that does the same.
 
 **Automatic daily backup (one-time setup).** The app signs in to your Google account once and then saves a backup every day to a **MyShot** folder in your Drive, silently, when you open the app. It keeps the last 14 backups and can only see files it created itself (the `drive.file` permission). This part is added to the build only after you set it up; until then builds are unchanged.
 
@@ -81,14 +87,14 @@ There are two ways, and both restore through **Settings → שחזור מגיב�
 4. **Clients → Create client → Web application**. Copy its client ID (it ends with `.apps.googleusercontent.com`).
 5. **Clients → Create client → Android**: package name `com.itranstudios.myshot`, SHA-1 `7C:C8:3B:70:05:C6:7E:AA:49:55:CC:77:B9:F9:46:EE:B9:41:01:61` (the key that signs the APKs from GitHub Actions). If you later build a signed release or publish to Google Play, add another Android client with that key's SHA-1 too (for Play, the App signing key from Play Console → App integrity).
 6. In this repository: **Settings → Secrets and variables → Actions → Variables → New repository variable**, name `GOOGLE_WEB_CLIENT_ID`, value: the **Web** client ID from step 4 (not the Android one).
-7. Run the workflow again (any push, or **Actions → Run workflow**), install the new APK, and in the app tap **Settings → גיבוי אוטומטי ל-Google Drive**.
+7. Run the workflow again (any push, or **Actions → Run workflow**), install the new APK, and in the app tap **Settings → גיבוי ונתונים → גיבוי אוטומטי ל-Google Drive**.
 
 While the consent screen is in *Testing*, Google may ask you to sign in again from time to time; if the automatic backup stops, tap **גיבוי עכשיו** to reconnect. Google Cloud changes can take a few hours to apply.
 
 ## App lock and discreet notifications
 
-- **Discreet notifications** are on by default (reminders screen → פרטיות). Notifications use private channels, so on a secured lock screen Android hides their content, and the text never names the medication or dose.
-- **App lock** (Settings → נעילת אפליקציה) is optional: a 4–6 digit PIN, stored only as a salted hash, plus fingerprint or the phone's screen lock if you turn it on. Lock immediately, after a minute or after 5 minutes. A notification tapped while locked waits until you unlock. If you forget the PIN and fingerprint is off, the only way back in is clearing the app's data, so keep a backup.
+- **Discreet notifications** are on by default (Settings → פרטיות ונעילה). Notifications use private channels, so on a secured lock screen Android hides their content, and the text never names the medication or dose.
+- **App lock** (Settings → פרטיות ונעילה) is optional, with one method: a 4–6 digit **PIN** (stored only as a salted hash), or **fingerprint**, with the phone's own screen lock as the fallback. Changing or removing the lock asks for the current method first. Lock immediately, after a minute or after 5 minutes. Coming back from the app's own camera, share sheet, file picker, Google sign-in or the fingerprint prompt does not lock it again. A notification tapped while locked waits until you unlock. If you forget the PIN, the only way back in is clearing the app's data, so keep a backup.
 
 ## AI features (optional)
 
@@ -125,7 +131,7 @@ Never commit the release keystore; `.gitignore` already excludes `*.jks`. The pa
 
 ## Automated checks
 
-Every push first runs `tests/run_tests.py` in GitHub Actions (the **test** job): the app loads in headless Chromium with the Android plugins, AI providers and Google Drive mocked, and 18 checks cover reminders and discreet notifications, logging a dose from a notification (and the duplicate-dose guard), the back button, backup and restore, receipt and meal recognition, the model list and fallback, supplement scanning and its safety rules, the meal-to-supplement prompt, the app lock, training and steps, Drive backup and retention, and layout at 360 px. **The APK is built only if every check passes**, so an update that breaks something never reaches the phone.
+Every push first runs `tests/run_tests.py` in GitHub Actions (the **test** job): the app loads in headless Chromium with the Android plugins, AI providers and Google Drive mocked, and 24 checks cover reminders and discreet notifications, logging a dose from a notification (and the duplicate-dose guard), the back button, backup and restore, receipt and meal recognition, the model list and fallback, supplement scanning and its safety rules, the meal-to-supplement prompt, the app lock with a PIN and with fingerprint, the settings pages, the first-launch restore (Drive, a file, or starting fresh) and the lock offer, training and steps, Drive backup and retention, and layout at 360 px. **The APK is built only if every check passes**, so an update that breaks something never reaches the phone.
 
 To run them on your computer: `python3 -m pip install playwright && python3 -m playwright install chromium && python3 tests/run_tests.py`
 

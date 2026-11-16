@@ -72,6 +72,11 @@ async def open_reminders(page):
     await page.click('.row[data-k="reminders"]'); await tick(page, 2)
 
 
+async def settings_page(page, p):
+    await page.click('[data-act="settings"]'); await tick(page, 2)
+    await page.click(f'[data-act="set-go"][data-p="{p}"]'); await tick(page, 2)
+
+
 async def mockdb(page, doc):
     raw = await page.evaluate("localStorage.getItem('__mockdb')")
     v = json.loads(raw).get(f"data/users/u123/{doc}")
@@ -105,6 +110,8 @@ async def boots_without_errors(b):
     try:
         check(await page.locator('.tab[data-tab="home"]').count() == 1, "tab bar missing")
         check(await page.locator('#app .hero, #app .dial, #app svg').count() > 0, "home screen did not render")
+        await tick(page, 3)
+        check(await page.locator('#sheet.open').count() == 0, "an existing user got a first-launch screen")
         check(not errs, f"JS errors: {errs}")
     finally:
         await ctx.close()
@@ -118,8 +125,8 @@ async def reminders_are_discreet_by_default(b):
         check(dose, "no dose reminder scheduled")
         check(dose[0]["title"] == "MyShot" and "מונג" not in dose[0]["body"], f"lock-screen text not discreet: {dose[0]['title']} / {dose[0]['body']}")
         check(dose[0]["ch"] == "meds2", f"dose reminder on channel {dose[0]['ch']}, expected the private meds2")
-        await open_reminders(page)
-        await page.click('.sw[data-k="discreet"]'); await tick(page, 4)
+        await settings_page(page, "privacy")
+        await page.click('[data-act="discreet-tog"]'); await tick(page, 4)
         dose = await page.evaluate("__ln.scheduled.filter(n => n.kind === 'dose')")
         check(dose and dose[0]["title"] != "MyShot", "turning discreet mode off did not bring the details back")
         check(not errs, f"JS errors: {errs}")
@@ -150,8 +157,10 @@ async def dose_logged_from_notification(b):
 async def back_button_closes_then_exits(b):
     ctx, page, errs = await open_app(b)
     try:
-        await page.click('[data-act="settings"]'); await tick(page, 2)
-        check(await page.locator('#sheet.open').count() == 1, "settings did not open")
+        await settings_page(page, "med")
+        check(await page.locator('#sheet.open').count() == 1, "settings page did not open")
+        await page.evaluate("__app.listeners.backButton({canGoBack:false})"); await tick(page, 2)
+        check(await page.locator('[data-act="set-go"]').count() > 0, "back from a settings page did not return to the settings list")
         await page.evaluate("__app.listeners.backButton({canGoBack:false})"); await tick(page, 2)
         check(await page.locator('#sheet.open').count() == 0, "back did not close the sheet")
         await page.evaluate("__app.listeners.backButton({canGoBack:false})"); await tick(page, 2)
@@ -165,7 +174,7 @@ async def backup_round_trip(b):
     grab = "window.__file = null; const __w = window.Capacitor.Plugins.Filesystem.writeFile; window.Capacitor.Plugins.Filesystem.writeFile = async o => { window.__file = o.data; return __w(o); };"
     ctx, page, errs = await open_app(b, grab)
     try:
-        await page.click('[data-act="settings"]'); await tick(page, 2)
+        await settings_page(page, "backup")
         await page.click('[data-act="backup-drive"]'); await settle(page)
         data = await page.evaluate("window.__file")
         check(data, "the backup file was not written")
@@ -177,7 +186,7 @@ async def backup_round_trip(b):
         await page.keyboard.press("Escape"); await tick(page, 2)
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
             f.write(data)
-        await page.click('[data-act="settings"]'); await tick(page, 2)
+        await settings_page(page, "backup")
         await page.set_input_files('#sheet input[data-file="import"]', f.name); await settle(page)
         await page.click('.confirm [data-c="1"]'); await settle(page, 0.5, 6)
         check("הגיבוי יובא" in await page.inner_text("#toast"), "restore did not finish")
@@ -225,7 +234,7 @@ async def gemini_moves_to_the_next_model_on_a_limit(b):
         await route.fulfill(status=200, content_type="application/json", body=gem_text({"date": "2026-11-12", "amount": 129.9, "vendor": "סופר-פארם", "category": "supps"}))
     ctx, page, errs = await open_app(b, key("gemini") + HTTP, routes=[("https://generativelanguage.googleapis.com/**", gemini)])
     try:
-        await page.click('[data-act="settings"]'); await settle(page, 0.3, 3)
+        await settings_page(page, "ai"); await settle(page, 0.3, 3)
         chips = await page.evaluate("Array.from(document.querySelectorAll('#f-aiblock [data-pick=aiModel]')).map(b => b.dataset.val)")
         check(chips == ["", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"], f"model list not filtered to the cheap image models: {chips}")
         await page.keyboard.press("Escape"); await tick(page, 2)
@@ -360,16 +369,18 @@ async def theme_toggle(b):
 async def app_lock_with_pin(b):
     ctx, page, errs = await open_app(b)
     try:
-        await page.click('[data-act="settings"]'); await tick(page, 2)
-        await page.click('[data-act="lock-toggle"]'); await tick(page, 3)
+        await settings_page(page, "privacy")
+        await page.click('[data-act="lock-method"][data-v="pin"]'); await tick(page, 3)
         await page.fill("#f-pin", "2468"); await page.click('[data-act="pin-next"]'); await tick(page, 2)
         await page.fill("#f-pin", "2468"); await page.click('[data-act="pin-next"]'); await settle(page, 1.0, 6)
         cfg = json.loads(await page.evaluate("localStorage.getItem('mj-lock')"))
-        check(cfg["on"] and cfg["len"] == 4 and "2468" not in json.dumps(cfg), "PIN not saved as a hash")
+        check(cfg["on"] and cfg["method"] == "pin" and cfg["len"] == 4 and "2468" not in json.dumps(cfg), "PIN not saved as a hash")
+        check(await page.locator('[data-act="lock-method"][data-v="pin"][aria-pressed="true"]').count() == 1, "the privacy page does not show the PIN method")
         await page.keyboard.press("Escape"); await tick(page, 2)
         await page.evaluate("__app.listeners.appStateChange({ isActive: false })"); await tick(page, 1)
         await page.evaluate("__app.listeners.appStateChange({ isActive: true })"); await tick(page, 3)
         check(await page.evaluate("!document.getElementById('lock').hidden"), "the app did not lock on return")
+        check(await page.locator('#lock .lock-bio-btn').count() == 0, "the PIN lock also offers fingerprint")
         await page.evaluate("__ln.listeners.localNotificationActionPerformed({actionId:'tap', notification:{extra:{kind:'weigh'}}})"); await tick(page, 3)
         check(await page.locator('#sheet.open').count() == 0, "a notification opened a screen behind the lock")
         for d in "1111":
@@ -407,6 +418,79 @@ async def training_and_steps(b):
         await ctx.close()
 
 
+BIO = """window.__bio = []; window.__bioFail = null;
+window.Capacitor.Plugins.BiometricAuthNative = { checkBiometry: async () => ({ isAvailable: true, deviceIsSecure: true }),
+  internalAuthenticate: async o => { __bio.push(o.reason);
+    // like a real phone: the prompt sends the app to the background and back
+    // (the return to the app arrives just after the prompt finishes, the order that used to re-lock)
+    const L = __app.listeners.appStateChange; if (L) L({ isActive: false });
+    await new Promise(r => setTimeout(r, 50)); setTimeout(() => { if (L) L({ isActive: true }); }, 30);
+    if (window.__bioFail) throw { code: window.__bioFail }; } };"""
+
+
+@test
+async def app_lock_with_fingerprint(b):
+    ctx, page, errs = await open_app(b, BIO)
+    try:
+        await settings_page(page, "privacy")
+        await page.click('[data-act="lock-method"][data-v="bio"]'); await settle(page, 0.3, 4)
+        cfg = json.loads(await page.evaluate("localStorage.getItem('mj-lock')"))
+        check(cfg["on"] and cfg["method"] == "bio" and "hash" not in cfg, f"fingerprint lock not saved on its own: {cfg}")
+        check("טביעת אצבע פועלת" in await page.inner_text("#toast"), "no confirmation after enabling fingerprint")
+        await page.keyboard.press("Escape"); await tick(page, 2)
+        n = await page.evaluate("__bio.length")
+        await page.evaluate("__app.listeners.appStateChange({ isActive: false })"); await tick(page, 1)
+        await page.evaluate("__app.listeners.appStateChange({ isActive: true })"); await settle(page, 0.3, 6)
+        check(await page.locator('#lock .lock-keys').count() == 0, "the fingerprint lock also shows a PIN keypad")
+        check(await page.evaluate("document.getElementById('lock').hidden"), "fingerprint did not unlock (or the prompt re-locked the app)")
+        await settle(page, 0.3, 8)
+        check(await page.evaluate("__bio.length") == n + 1, f"expected exactly one prompt, got {await page.evaluate('__bio.length') - n}")
+        check(await page.evaluate("document.getElementById('lock').hidden"), "the app locked again after unlocking")
+        # our own share sheet is not "leaving the app"
+        await settings_page(page, "backup")
+        await page.click('[data-act="backup-drive"]'); await settle(page)
+        await page.evaluate("__app.listeners.appStateChange({ isActive: false })"); await tick(page, 1)
+        await page.evaluate("__app.listeners.appStateChange({ isActive: true })"); await tick(page, 3)
+        check(await page.evaluate("!document.getElementById('lock') || document.getElementById('lock').hidden"), "returning from the share sheet locked the app")
+        await page.keyboard.press("Escape"); await tick(page, 2)
+        # a cancelled prompt leaves the lock with a retry button; retry works
+        await page.evaluate("window.__bioFail = 'userCancel'")
+        await page.evaluate("__app.listeners.appStateChange({ isActive: false })"); await tick(page, 1)
+        await page.evaluate("__app.listeners.appStateChange({ isActive: true })"); await settle(page, 0.3, 6)
+        check(await page.evaluate("!document.getElementById('lock').hidden"), "a cancelled prompt unlocked the app")
+        check("לחצו" in await page.inner_text("#lock-msg"), "no retry hint after a cancelled prompt")
+        await page.evaluate("window.__bioFail = null")
+        await page.click('#lock [data-lock="bio"]'); await settle(page, 0.3, 6)
+        check(await page.evaluate("document.getElementById('lock').hidden"), "retrying the fingerprint did not unlock")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def settings_list_and_pages(b):
+    ctx, page, errs = await open_app(b)
+    try:
+        await page.click('[data-act="settings"]'); await tick(page, 2)
+        rows = await page.evaluate("Array.from(document.querySelectorAll('#sheet [data-act=set-go]')).map(b => b.dataset.p)")
+        check(rows == ["med", "goals", "privacy", "backup"] or rows == ["med", "goals", "ai", "privacy", "backup"], f"settings rows: {rows}")
+        check(await page.locator('#sheet [data-act="rem-page"]').count() == 1 and await page.locator('#sheet [data-pick="theme"]').count() == 3, "reminders row or theme buttons missing")
+        check(await page.locator('#sheet input').count() == 0, "the settings list should have no form fields")
+        await page.click('[data-act="set-go"][data-p="goals"]'); await tick(page, 2)
+        await page.fill("#f-water", "10"); await page.click('#sheet [data-pick="tg"][data-val="3"]'); await page.click('[data-act="set-save"]'); await tick(page, 4)
+        check("היעדים נשמרו" in await page.inner_text("#toast"), "goals were not saved")
+        core = await mockdb(page, "core")
+        check(core["settings"]["water"] == 10 and core["settings"]["trainGoal"] == 3, f"goals not stored: water {core['settings'].get('water')}, training {core['settings'].get('trainGoal')}")
+        check(await page.locator('[data-act="set-go"]').count() > 0, "saving a page did not return to the settings list")
+        await page.click('[data-act="set-go"][data-p="med"]'); await tick(page, 2)
+        check(await page.locator('#sheet [data-pick="med"]').count() > 3, "the medication page has no medication choices")
+        await page.click('[data-act="set-back"]'); await tick(page, 2)
+        check(await page.locator('[data-act="set-go"]').count() > 0, "the back link did not return to the settings list")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
 GOOGLE = """window.MYSHOT_GOOGLE_WEB_CLIENT_ID = '123-web.apps.googleusercontent.com';
 window.__sl = []; window.Capacitor.Plugins.SocialLogin = {
   initialize: async o => { __sl.push('init'); },
@@ -439,7 +523,7 @@ async def drive_backup_keeps_14(b):
             st["deleted"].append(r.url.rsplit("/", 1)[1]); return await route.fulfill(status=204, body="")
     ctx, page, errs = await open_app(b, HTTP + GOOGLE, routes=[("https://www.googleapis.com/**", drive)])
     try:
-        await page.click('[data-act="settings"]'); await tick(page, 2)
+        await settings_page(page, "backup")
         await page.click('[data-act="gd-connect"]'); await settle(page, 0.6, 10)
         check("נשמר ב-Drive" in await page.inner_text("#toast"), "the first Drive backup did not finish")
         check(st["uploads"] == 1, f"expected one upload, got {st['uploads']}")
@@ -453,7 +537,7 @@ async def drive_backup_keeps_14(b):
 async def drive_hidden_without_client_id(b):
     ctx, page, errs = await open_app(b)
     try:
-        await page.click('[data-act="settings"]'); await tick(page, 2)
+        await settings_page(page, "backup")
         check(await page.locator('[data-act="gd-connect"]').count() == 0, "the Drive block appears without a client ID")
         check(await page.locator('[data-act="backup-drive"]').count() == 1, "the share-sheet backup is missing")
     finally:
@@ -477,6 +561,106 @@ async def no_horizontal_overflow_at_360px(b):
         for seg in ["symptoms", "body", "train"]:
             await page.click(f'[data-act="seg"][data-k="{seg}"]'); await tick(page, 2); await probe(f"track/{seg}")
         check(not bad, f"horizontal overflow: {bad}")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+FRESH = "if (!localStorage.getItem('__fresh')) { localStorage.setItem('__mockdb', '{}'); localStorage.setItem('__fresh', '1'); }\n"
+BACKUP = json.dumps({"app": "mounjaro-journal", "v": 2, "appVersion": "1.6.1", "exported": "2026-11-12T20:00:00Z", "docs": SEED, "images": {}, "photos": {}}, ensure_ascii=False)
+
+
+def drive_with(files):
+    async def drive(route):
+        r = route.request; u = r.url.replace("%20", " ").replace("%27", "'").replace("%3D", "=")
+        if r.method == "GET" and "alt=media" in u:
+            return await route.fulfill(status=200, content_type="application/json", body=BACKUP)
+        if r.method == "GET" and "name contains 'myshot-backup-'" in u:
+            return await route.fulfill(status=200, content_type="application/json", body=json.dumps({"files": files}))
+        await route.fulfill(status=200, content_type="application/json", body=json.dumps({"files": []}))
+    return drive
+
+
+async def welcome_choices(page):
+    await tick(page, 3)
+    check(await page.locator('#sheet.open').count() == 1 and "ברוכים הבאים" in await page.inner_text("#sheet .sheet-title"), "no welcome screen on a new install")
+    acts = await page.evaluate("Array.from(document.querySelectorAll('#f-welcome [data-act], #f-welcome input[type=file]')).map(e => e.dataset.act || e.dataset.file)")
+    check(acts == ["welcome-drive", "welcome-import", "welcome-new"], f"welcome options: {acts}")
+
+
+@test
+async def first_run_start_fresh_then_lock_offer(b):
+    ctx, page, errs = await open_app(b, BIO, pre=FRESH)
+    try:
+        await welcome_choices(page)
+        await page.click('[data-act="welcome-new"]'); await tick(page, 3)
+        check(await page.locator('#sheet [data-pick="med"]').count() > 3, "'start fresh' did not open the setup")
+        await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
+        check(await page.locator('#sheet.open').count() == 1 and "לנעול" in await page.inner_text("#sheet .sheet-title"), "no lock offer after the first setup")
+        check(await page.locator('#offer-bio').count() == 1 and await page.locator('[data-act="offer-pin"]').count() == 1, "the lock offer should give fingerprint and code")
+        await page.click('[data-act="offer-pin"]'); await tick(page, 2)
+        await page.fill("#f-pin", "1357"); await page.click('[data-act="pin-next"]'); await tick(page, 2)
+        await page.fill("#f-pin", "1357"); await page.click('[data-act="pin-next"]'); await settle(page, 1.0, 6)
+        cfg = json.loads(await page.evaluate("localStorage.getItem('mj-lock')"))
+        check(cfg["method"] == "pin", f"lock not set from the offer: {cfg}")
+        check(await page.locator('#sheet.open').count() == 0, "the offer did not close after choosing a code")
+        check(await page.evaluate("localStorage.getItem('mj-lock-offer')") == "1", "the offer will be shown again")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def first_run_restores_from_drive(b):
+    files = [{"id": "b2", "name": "myshot-backup-2026-11-12.json", "modifiedTime": "2026-11-12T20:00:00Z", "size": "40960"},
+             {"id": "b1", "name": "myshot-backup-2026-11-11.json", "modifiedTime": "2026-11-11T20:00:00Z", "size": "40000"},
+             {"id": "x9", "name": "myshot-backup-notes.txt", "modifiedTime": "2026-11-10T20:00:00Z"}]
+    ctx, page, errs = await open_app(b, HTTP + GOOGLE + BIO, pre=FRESH, routes=[("https://www.googleapis.com/**", drive_with(files))])
+    try:
+        await welcome_choices(page)
+        await page.click('[data-act="welcome-drive"]'); await settle(page, 0.5, 6)
+        body = await page.inner_text("#f-welcome")
+        check("נמצא גיבוי" in body and "12.11" in body, f"the latest Drive backup was not found: {body[:120]}")
+        check(await page.locator('#f-welcome [data-act="welcome-restore"]').count() == 2, "expected the latest backup plus one earlier one (not the .txt)")
+        await page.click('#f-welcome .btn[data-act="welcome-restore"]'); await settle(page, 0.6, 8)
+        check(await page.locator(".confirm").count() == 0, "a new install should not ask to replace data")
+        inj = (await mockdb(page, "injections")) or {"items": []}
+        check(len(inj["items"]) == len(SEED["injections"]["items"]), f"restored {len(inj['items'])} injections, expected {len(SEED['injections']['items'])}")
+        check(await page.locator('#sheet.open').count() == 1 and "לנעול" in await page.inner_text("#sheet .sheet-title"), "no lock offer after restoring")
+        await page.click('[data-act="offer-skip"]'); await tick(page, 2)
+        check(await page.locator('#sheet.open').count() == 0, "'not now' did not close the offer")
+        check(json.loads(await page.evaluate("localStorage.getItem('mj-gdrive')") or "{}").get("connected"), "Drive should stay connected for the daily backup")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def first_run_drive_has_no_backup(b):
+    ctx, page, errs = await open_app(b, HTTP + GOOGLE, pre=FRESH, routes=[("https://www.googleapis.com/**", drive_with([]))])
+    try:
+        await welcome_choices(page)
+        await page.click('[data-act="welcome-drive"]'); await settle(page, 0.5, 6)
+        body = await page.inner_text("#f-welcome")
+        check("לא נמצא ב-Drive גיבוי" in body, "no message when Drive has no backup")
+        check(await page.locator('#f-welcome input[data-file="welcome-import"]').count() == 1 and await page.locator('#f-welcome [data-act="welcome-new"]').count() == 1, "the other options disappeared")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def first_run_restores_from_a_file(b):
+    ctx, page, errs = await open_app(b, BIO, pre=FRESH)
+    try:
+        await welcome_choices(page)
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+            f.write(BACKUP)
+        await page.set_input_files('#f-welcome input[data-file="welcome-import"]', f.name); await settle(page, 0.6, 8)
+        check("שוחזר" in await page.inner_text("#toast"), "the backup file was not restored")
+        core = await mockdb(page, "core")
+        check(core and core["settings"].get("setup"), "settings not restored")
+        check(await page.locator('#sheet.open').count() == 1 and "לנעול" in await page.inner_text("#sheet .sheet-title"), "no lock offer after restoring from a file")
         check(not errs, f"JS errors: {errs}")
     finally:
         await ctx.close()

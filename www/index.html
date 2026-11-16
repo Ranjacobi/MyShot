@@ -522,6 +522,8 @@ html.is-locked body>*:not(#lock){visibility:hidden}
 .lock-key{height:64px;border-radius:50%;border:0;background:var(--surface-2);color:var(--ink);font-size:24px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .lock-key:active{background:var(--line)}.lock-key.off{visibility:hidden;pointer-events:none}
 .card-chart{margin-top:12px;background:var(--surface);border-radius:16px;padding:10px 8px}.steps-chart{width:100%;height:auto;display:block}.sb{fill:var(--seg-todo)}.sb-ok{fill:var(--ok)}.sb-goal{stroke:var(--ink-3);stroke-width:1.5;stroke-dasharray:4 4}.sb-l{font-size:11px;fill:var(--ink-3);text-anchor:middle}
+.set-ico{display:inline-flex;width:34px;height:34px;border-radius:10px;background:var(--surface-2);align-items:center;justify-content:center;color:var(--ink);flex:none}.set-ico svg{width:20px;height:20px}.set-back{display:inline-flex;align-items:center;gap:4px;background:none;border:0;color:var(--ink-2);font:inherit;font-size:15px;font-weight:600;padding:2px 0 12px;cursor:pointer}.set-back svg{width:18px;height:18px}.lock-bio-btn{margin-top:6px;min-height:56px;font-size:17px;gap:10px}
+.welcome-opts{display:flex;flex-direction:column;gap:10px}.wopt{display:flex;align-items:center;gap:14px;width:100%;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;font:inherit;color:var(--ink);cursor:pointer;min-height:68px;box-sizing:border-box}.wopt:active{background:var(--surface-2)}.wopt-ico{display:inline-flex;width:42px;height:42px;border-radius:12px;background:var(--surface-2);align-items:center;justify-content:center;flex:none}.wopt-ico svg{width:24px;height:24px}.wopt-txt{display:flex;flex-direction:column;gap:2px;min-width:0}.wopt .row-title{font-weight:600}.wopt input[type=file]{display:none}
 </style>
 </head>
 <body>
@@ -776,8 +778,10 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.2';
 const CHANGELOG = [
+  ['1.6.2', 'בפתיחה הראשונה: שחזור מ-Google Drive, בחירת קובץ גיבוי או התחלה חדשה, והצעה לנעול את האפליקציה'],
+  ['1.6.1', 'נעילה בשיטה אחת לבחירה, קוד או טביעת אצבע, טביעת אצבע אמינה יותר, והגדרות מסודרות מחדש'],
   ['1.6.0', 'התראות דיסקרטיות, נעילה בקוד או בטביעת אצבע, אימונים וצעדים, גיבוי אוטומטי ל-Drive'],
   ['1.5.0', 'צילום תוסף: זיהוי, הסבר, התאמה לטיפול, זמנים מומלצים ותזכורות, כולל תזכורת כשמתעדים ארוחה'],
   ['1.4.2', 'בחירת מודל AI מרשימה שמתעדכנת לבד: רק המודלים הזולים שמזהים תמונות'],
@@ -1059,61 +1063,86 @@ function markSlotTaken(ds, slot) {
 }
 
 
-/* ---------- app lock (optional): PIN, plus fingerprint or the phone's screen lock ---------- */
+/* ---------- app lock (optional): one method, a PIN or fingerprint (with the phone's screen lock as fallback) ---------- */
 const b64 = u8 => btoa(String.fromCharCode(...u8));
 const unb64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+const icoLock = () => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+const icoFinger = () => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 11v3a8 8 0 0 1-1 4"/><path d="M8 10.5a4 4 0 0 1 8 0V13a12 12 0 0 1-.6 3.8"/><path d="M5.2 8.3A8 8 0 0 1 19.8 9.5"/><path d="M4.5 13.5V12a7.5 7.5 0 0 1 .3-2"/><path d="M7.7 18.3A10 10 0 0 0 8 14v-3"/><path d="M19.7 14.5c-.1 1.5-.4 3-.9 4.4"/></svg>';
 const Bio = {
   p() { return Native.plugin('BiometricAuthNative'); },
   async available() {
     const B = this.p(); if (!B) return false;
     try { const r = await B.checkBiometry(); return !!(r && (r.isAvailable || r.strongBiometryIsAvailable || r.deviceIsSecure)); } catch (e) { return false; }
   },
-  async auth() {
-    const B = this.p(); if (!B) return false;
-    const opts = { reason: 'פתיחת MyShot', cancelTitle: 'ביטול', allowDeviceCredential: true, androidTitle: 'פתיחת MyShot', androidSubtitle: 'טביעת אצבע או נעילת המסך של הטלפון', androidConfirmationRequired: false };
-    for (const m of ['internalAuthenticate', 'authenticate']) {
-      try { await B[m](opts); return true; }
-      catch (e) { if (/UNIMPLEMENTED|not implemented/i.test(String((e && (e.code || e.message)) || e))) continue; return false; }
-    }
-    return false;
+  // The prompt itself can send the app to the background for a moment; Lock ignores that.
+  async auth(why) {
+    const B = this.p(); if (!B) return { ok: false, code: 'unavailable' };
+    const opts = { reason: why || 'פתיחת MyShot', cancelTitle: 'ביטול', allowDeviceCredential: true, androidTitle: why || 'פתיחת MyShot', androidSubtitle: 'טביעת אצבע, או קוד הנעילה של הטלפון', androidConfirmationRequired: false };
+    Lock.prompting = true;
+    try {
+      for (const m of ['internalAuthenticate', 'authenticate']) {
+        try { await B[m](opts); return { ok: true }; }
+        catch (e) {
+          const code = String((e && (e.code || e.message)) || e);
+          if (/UNIMPLEMENTED|not implemented/i.test(code)) continue;
+          return { ok: false, code: /lockout/i.test(code) ? 'lockout' : /cancel/i.test(code) ? 'cancel' : /notAvailable|notEnrolled|noDeviceCredential|passcodeNotSet|not available/i.test(code) ? 'unavailable' : 'failed' };
+        }
+      }
+      return { ok: false, code: 'unavailable' };
+    } finally { Lock.prompting = false; Lock.graceUntil = Date.now() + 1500; }
   },
 };
 const Lock = {
-  locked: false, fails: 0, until: 0, bgAt: 0, waiting: [], entry: '',
-  cfg() { try { return JSON.parse(localStorage.getItem('mj-lock') || 'null'); } catch (e) { return null; } },
-  on() { const c = this.cfg(); return !!(c && c.on && c.hash); },
+  locked: false, fails: 0, until: 0, bgAt: 0, awayUntil: 0, graceUntil: 0, prompting: false, waiting: [], entry: '', verifyRes: null,
+  cfg() { let c = null; try { c = JSON.parse(localStorage.getItem('mj-lock') || 'null'); } catch (e) {} if (c && c.on && !c.method) c.method = c.bio ? 'bio' : 'pin'; return c; },
+  method() { const c = this.cfg(); return c && c.on && (c.method === 'bio' || (c.method === 'pin' && c.hash)) ? c.method : 'none'; },
+  on() { return this.method() !== 'none'; },
+  write(c) { try { localStorage.setItem('mj-lock', JSON.stringify(c)); } catch (e) {} },
   async hash(pin, salt) {
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
     const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 120000 }, key, 256);
     return b64(new Uint8Array(bits));
   },
-  async setPin(pin) {
-    const salt = crypto.getRandomValues(new Uint8Array(16)), c = this.cfg() || {};
-    const next = { on: true, len: pin.length, salt: b64(salt), hash: await this.hash(pin, salt), bio: !!c.bio, after: c.after === undefined ? 0 : c.after };
-    try { localStorage.setItem('mj-lock', JSON.stringify(next)); } catch (e) {}
-  },
-  async check(pin) { const c = this.cfg(); if (!c) return false; return (await this.hash(pin, unb64(c.salt))) === c.hash; },
-  patch(p) { const c = this.cfg(); if (!c) return; try { localStorage.setItem('mj-lock', JSON.stringify({ ...c, ...p })); } catch (e) {} },
+  async setPin(pin) { const salt = crypto.getRandomValues(new Uint8Array(16)), c = this.cfg() || {}; this.write({ on: true, method: 'pin', len: pin.length, salt: b64(salt), hash: await this.hash(pin, salt), after: c.after === undefined ? 0 : c.after }); },
+  setBio() { const c = this.cfg() || {}; this.write({ on: true, method: 'bio', after: c.after === undefined ? 0 : c.after }); },
+  async check(pin) { const c = this.cfg(); if (!c || !c.hash) return false; return (await this.hash(pin, unb64(c.salt))) === c.hash; },
+  patch(p) { const c = this.cfg(); if (c) this.write({ ...c, ...p }); },
   off() { try { localStorage.removeItem('mj-lock'); } catch (e) {} this.locked = false; this.hide(); },
+  // Opening our own camera, share sheet, file picker or Google sign-in does not count as leaving the app.
+  away(ms) { this.awayUntil = Date.now() + (ms || 5 * 60000); },
+  onBackground() { if (!this.prompting) this.bgAt = Date.now(); },
+  onActive() {
+    const bg = this.bgAt; this.bgAt = 0;
+    if (!this.on() || this.locked || this.prompting || Date.now() < this.graceUntil || !bg) return;
+    if (Date.now() < this.awayUntil) { this.awayUntil = 0; return; }
+    if (Date.now() - bg >= ((this.cfg() || {}).after || 0) * 1000) this.show();
+  },
   whenOpen(fn) { if (this.locked) this.waiting.push(fn); else fn(); },
   show() {
     if (!this.on()) return;
-    this.locked = true; this.entry = '';
+    this.locked = true; this.entry = ''; this.fails = 0;
     let el = document.getElementById('lock');
     if (!el) { el = document.createElement('div'); el.id = 'lock'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'MyShot נעולה'); document.body.appendChild(el); }
-    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'bio', '0', 'del'];
-    el.innerHTML = `<div class="lock-in"><div class="lock-logo">${LOGO_MARK}</div><h2>MyShot נעולה</h2><p class="lock-msg" id="lock-msg">הקלידו את הקוד</p>
-      <div class="lock-dots" id="lock-dots" aria-hidden="true">${'<i></i>'.repeat((this.cfg() || {}).len || 6)}</div>
-      <div class="lock-keys">${keys.map(k => k === 'bio' ? `<button class="lock-key lock-bio off" data-lock="bio" aria-label="פתיחה בטביעת אצבע" tabindex="-1">☝︎</button>` : k === 'del' ? '<button class="lock-key" data-lock="del" aria-label="מחיקה">⌫</button>' : `<button class="lock-key num" data-lock="${k}">${k}</button>`).join('')}</div></div>`;
+    const bio = this.method() === 'bio', len = (this.cfg() || {}).len || 6;
+    el.innerHTML = bio
+      ? `<div class="lock-in"><div class="lock-logo">${LOGO_MARK}</div><h2>MyShot נעולה</h2><p class="lock-msg" id="lock-msg">פותחים בטביעת אצבע</p><button class="btn block lock-bio-btn" data-lock="bio">${icoFinger()}<span>פתיחה בטביעת אצבע</span></button><p class="tiny muted" style="margin-top:14px">אם טביעת האצבע לא מזוהה, אפשר להשתמש בקוד הנעילה של הטלפון.</p></div>`
+      : `<div class="lock-in"><div class="lock-logo">${LOGO_MARK}</div><h2>MyShot נעולה</h2><p class="lock-msg" id="lock-msg">הקלידו את הקוד</p><div class="lock-dots" id="lock-dots" aria-hidden="true">${'<i></i>'.repeat(len)}</div>
+        <div class="lock-keys">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(k => k === '' ? '<span class="lock-key off" aria-hidden="true"></span>' : k === 'del' ? '<button class="lock-key" data-lock="del" aria-label="מחיקה">⌫</button>' : `<button class="lock-key num" data-lock="${k}">${k}</button>`).join('')}</div></div>`;
     el.hidden = false; document.documentElement.classList.add('is-locked');
-    const c = this.cfg();
-    if (c && c.bio) Bio.available().then(ok => { const b = el.querySelector('.lock-bio'); if (b && ok) { b.classList.remove('off'); b.removeAttribute('tabindex'); this.tryBio(); } });
+    if (bio) setTimeout(() => { if (this.locked && document.visibilityState !== 'hidden') this.tryBio(); }, 350);
   },
   hide() { const el = document.getElementById('lock'); if (el) el.hidden = true; document.documentElement.classList.remove('is-locked'); },
-  dots() { const d = document.querySelectorAll('#lock-dots i'); d.forEach((x, i) => x.classList.toggle('on', i < this.entry.length)); },
+  dots() { document.querySelectorAll('#lock-dots i').forEach((x, i) => x.classList.toggle('on', i < this.entry.length)); },
   msg(t, bad) { const m = document.getElementById('lock-msg'); if (m) { m.textContent = t; m.classList.toggle('bad', !!bad); } },
-  async tryBio() { if (await Bio.auth()) this.open(); },
-  open() { this.locked = false; this.fails = 0; this.hide(); const w = this.waiting.splice(0); for (const f of w) { try { f(); } catch (e) {} } Reminders.flush(); },
+  async tryBio() {
+    if (this.prompting || !this.locked) return;
+    this.msg('ממתין לטביעת אצבע…');
+    const r = await Bio.auth();
+    if (r.ok) { this.open(); return; }
+    if (r.code === 'unavailable' && !(await Bio.available())) { this.off(); this.open(); toast('הנעילה בוטלה: אין בטלפון טביעת אצבע או נעילת מסך.', 'alert'); return; }
+    this.msg(r.code === 'lockout' ? 'יותר מדי ניסיונות. נסו שוב בעוד רגע, או עם קוד הנעילה של הטלפון.' : r.code === 'cancel' ? 'לחצו על הכפתור כדי לפתוח' : 'לא זוהה. לחצו כדי לנסות שוב.', r.code !== 'cancel');
+  },
+  open() { this.locked = false; this.fails = 0; this.graceUntil = Date.now() + 1500; this.hide(); const w = this.waiting.splice(0); for (const f of w) { try { f(); } catch (e) {} } Reminders.flush(); },
   async key(k) {
     if (k === 'bio') { this.tryBio(); return; }
     if (Date.now() < this.until) { this.msg(`יותר מדי ניסיונות. נסו שוב בעוד ${Math.ceil((this.until - Date.now()) / 1000)} שניות.`, true); return; }
@@ -1123,27 +1152,42 @@ const Lock = {
     this.entry += k; this.dots();
     if (this.entry.length < len) return;
     if (await this.check(this.entry)) { this.open(); return; }
-    {
-      this.fails++; this.entry = ''; this.dots();
-      if (this.fails >= 5) { this.until = Date.now() + 30000; this.fails = 0; this.msg('יותר מדי ניסיונות. נסו שוב בעוד 30 שניות.', true); }
-      else this.msg('קוד שגוי', true);
-      const box = document.querySelector('.lock-dots'); if (box && box.animate && !reducedMotion()) box.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-10px)' }, { transform: 'translateX(10px)' }, { transform: 'translateX(0)' }], { duration: 300 });
-    }
+    this.fails++; this.entry = ''; this.dots();
+    if (this.fails >= 5) { this.until = Date.now() + 30000; this.fails = 0; this.msg('יותר מדי ניסיונות. נסו שוב בעוד 30 שניות.', true); }
+    else this.msg('קוד שגוי', true);
+    const box = document.querySelector('.lock-dots'); if (box && box.animate && !reducedMotion()) box.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-10px)' }, { transform: 'translateX(10px)' }, { transform: 'translateX(0)' }], { duration: 300 });
+  },
+  // Confirm it is the owner before changing or removing the lock.
+  verify() {
+    const m = this.method();
+    if (m === 'none') return Promise.resolve(true);
+    if (m === 'bio') return Bio.auth('אימות לפני שינוי הנעילה').then(r => r.ok);
+    return new Promise(res => {
+      this.verifyRes = res;
+      F = { kind: 'pinverify', back: () => openSetPage('privacy') };
+      Sheet.open('הקוד הנוכחי', `<p class="lead" style="margin-top:4px">כדי לשנות את הנעילה, הקלידו את הקוד הנוכחי.</p><label class="field"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="f-pin" autocomplete="off" dir="ltr" style="text-align:center;font-size:26px;letter-spacing:.4em"></label><div id="pin-err"></div>`, '<button class="btn" data-act="pin-verify">המשך</button>');
+    });
   },
 };
 document.addEventListener('click', e => { const b = e.target && e.target.closest && e.target.closest('[data-lock]'); if (b) { e.preventDefault(); Lock.key(b.dataset.lock); } }, true);
-function lockSettingsHTML() {
-  const c = Lock.cfg(), on = Lock.on(), after = c && c.after !== undefined ? c.after : 0;
-  let h = `<h3 class="h-sub" style="margin-top:26px">נעילת אפליקציה</h3><div class="group"><div class="row"><div class="grow"><div class="row-title">נעילה בקוד</div><div class="row-sub">${on ? 'פועלת' : 'כבויה. אפשר להפעיל ולבחור קוד של 4 עד 6 ספרות'}</div></div><button class="sw" role="switch" aria-checked="${on}" aria-label="נעילה בקוד" data-act="lock-toggle"></button></div>`;
-  if (on) h += `<div class="row"><div class="grow"><div class="row-title">פתיחה בטביעת אצבע</div><div class="row-sub" id="f-bio-sub">או בנעילת המסך של הטלפון</div></div><button class="sw" role="switch" aria-checked="${!!c.bio}" aria-label="פתיחה בטביעת אצבע" data-act="lock-bio"></button></div>
-    <div class="row col"><span class="row-title">לנעול</span><div class="chips">${[[0, 'מיד ביציאה'], [60, 'אחרי דקה'], [300, 'אחרי 5 דקות']].map(([v, l]) => `<button class="chip" data-act="lock-after" data-v="${v}" aria-pressed="${after === v}">${l}</button>`).join('')}</div></div>
-    <button class="row add" data-act="lock-change"><span class="grow">שינוי הקוד</span>${ICON.chev}</button>`;
+document.addEventListener('click', e => { if (e.target && e.target.closest && e.target.closest('input[type=file], label.file-btn')) Lock.away(); }, true);
+function privacyPageHTML(bioOK) {
+  const m = Lock.method(), c = Lock.cfg() || {}, after = c.after !== undefined ? c.after : 0;
+  const what = m === 'pin' ? 'פותחים בקוד של 4 עד 6 ספרות שבחרתם.' : m === 'bio' ? 'פותחים בטביעת אצבע. אם היא לא מזוהה, בקוד הנעילה של הטלפון.' : 'כל מי שפותח את הטלפון יכול לפתוח גם את האפליקציה.';
+  let h = `<div class="group"><div class="row col"><span class="row-title">נעילת אפליקציה</span><div class="chips" role="group" aria-label="נעילת אפליקציה">
+      <button class="chip" data-act="lock-method" data-v="none" aria-pressed="${m === 'none'}">בלי נעילה</button>
+      <button class="chip" data-act="lock-method" data-v="pin" aria-pressed="${m === 'pin'}">קוד</button>
+      ${Native.on ? `<button class="chip" data-act="lock-method" data-v="bio" aria-pressed="${m === 'bio'}"${bioOK === false && m !== 'bio' ? ' disabled' : ''}>טביעת אצבע</button>` : ''}
+    </div><div class="row-sub" style="margin-top:8px">${what}${bioOK === false && Native.on && m !== 'bio' ? ' בטלפון הזה אין טביעת אצבע או נעילת מסך, ולכן אפשר לבחור רק קוד.' : ''}</div></div>`;
+  if (m !== 'none') h += `<div class="row col"><span class="row-title">מתי לנעול</span><div class="chips">${[[0, 'מיד ביציאה'], [60, 'אחרי דקה'], [300, 'אחרי 5 דקות']].map(([v, l]) => `<button class="chip" data-act="lock-after" data-v="${v}" aria-pressed="${after === v}">${l}</button>`).join('')}</div></div>`;
+  if (m === 'pin') h += `<button class="row add" data-act="lock-change"><span class="grow">שינוי הקוד</span>${ICON.chev}</button>`;
   h += '</div>';
-  if (on) h += '<p class="tiny muted" style="margin-top:8px">שכחתם את הקוד? אם טביעת האצבע פעילה, פותחים איתה ומחליפים קוד. אחרת אין דרך לשחזר אותו בלי למחוק את נתוני האפליקציה, ולכן כדאי לשמור גיבוי.</p>';
+  if (m === 'pin') h += '<p class="tiny muted" style="margin-top:8px">שכחתם את הקוד? אין דרך לשחזר אותו בלי למחוק את נתוני האפליקציה, ולכן כדאי לשמור גיבוי.</p>';
+  if (Native.on) { const r = remCfg(); h += `<h3 class="h-sub" style="margin-top:22px">התראות</h3><div class="group"><div class="row"><div class="grow"><div class="row-title">התראות דיסקרטיות</div><div class="row-sub">${r.discreet ? 'במסך הנעילה רק ״תזכורת מ-MyShot״, בלי שם התרופה או המינון' : 'ההתראות מציגות את שם התרופה, המינון והפרטים'}</div></div><button class="sw" role="switch" aria-checked="${!!r.discreet}" aria-label="התראות דיסקרטיות" data-act="discreet-tog"></button></div></div>`; }
   return h;
 }
-function openPinSheet(mode) {
-  F = { kind: 'pin', mode, step: 1, first: '' };
+function openPinSheet(mode, done) {
+  F = { kind: 'pin', mode, step: 1, first: '', done, back: done ? () => Sheet.close() : () => openSetPage('privacy') };
   Sheet.open(mode === 'change' ? 'קוד חדש' : 'בחירת קוד', `<p class="lead" id="pin-q" style="margin-top:4px">הקלידו קוד של 4 עד 6 ספרות</p><label class="field"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="f-pin" autocomplete="off" style="text-align:center;font-size:26px;letter-spacing:.4em" dir="ltr"></label><div id="pin-err"></div>`, '<button class="btn" data-act="pin-next">המשך</button>');
 }
 async function pinNext() {
@@ -1151,7 +1195,7 @@ async function pinNext() {
   if (!/^\d{4,6}$/.test(v)) { $('#pin-err', sh).innerHTML = '<div class="note warn">קוד של 4 עד 6 ספרות בלבד.</div>'; return; }
   if (F.step === 1) { F.first = v; F.step = 2; $('#f-pin', sh).value = ''; $('#pin-q', sh).textContent = 'הקלידו שוב לאישור'; $('#pin-err', sh).innerHTML = ''; return; }
   if (v !== F.first) { F.step = 1; F.first = ''; $('#f-pin', sh).value = ''; $('#pin-q', sh).textContent = 'הקלידו קוד של 4 עד 6 ספרות'; $('#pin-err', sh).innerHTML = '<div class="note warn">הקודים לא תאמו. נסו שוב.</div>'; return; }
-  await Lock.setPin(v); Sheet.close(); toast('הנעילה פועלת'); setTimeout(() => openSettings(), 250);
+  const done = F.done; await Lock.setPin(v); toast('הנעילה בקוד פועלת'); if (done) done(); else openSetPage('privacy');
 }
 
 
@@ -1244,7 +1288,7 @@ const GDrive = {
     const options = { scopes: [this.scope] };
     if (!interactive) { options.filterByAuthorizedAccounts = true; options.autoSelectEnabled = true; }
     let res;
-    try { res = await SL.login({ provider: 'google', options }); }
+    Lock.away(); try { res = await SL.login({ provider: 'google', options }); }
     catch (e) { const m = String((e && (e.message || e.code)) || e); throw { code: /cancel/i.test(m) ? 'cancel' : 'auth', detail: m }; }
     const r = (res && res.result) || {}, at = r.accessToken;
     if (!at || !at.token) throw { code: 'auth' };
@@ -1282,6 +1326,11 @@ const GDrive = {
     try { const files = await this.list(tk); for (const f of files.slice(14)) await gReq(tk, 'DELETE', `https://www.googleapis.com/drive/v3/files/${f.id}`); } catch (e) {}
     return name;
   },
+  async findBackups(tk) {
+    const q = encodeURIComponent("name contains 'myshot-backup-' and trashed=false");
+    const r = await gReq(tk, 'GET', `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime%20desc&pageSize=20&spaces=drive&fields=files(id,name,modifiedTime,createdTime,size)`);
+    return ((r && r.files) || []).filter(f => /^myshot-backup-.*\.json$/.test(f.name));
+  },
   async download(id) { const tk = await this.token(true), r = await gReq(tk, 'GET', `https://www.googleapis.com/drive/v3/files/${id}?alt=media`); return typeof r === 'string' ? r : JSON.stringify(r); },
   async auto() {
     if (!this.enabled() || !this.connected() || this.st().auto === false || this.inflight) return;
@@ -1309,6 +1358,61 @@ async function driveRestorePick() {
   Sheet.open('שחזור מ-Drive', list.length ? `<p class="lead" style="margin-top:4px">בחרו גיבוי. השחזור מחליף את כל הנתונים הנוכחיים.</p><div class="group">${list.map(f => `<button class="row" data-act="gd-pick" data-id="${esc(f.id)}" data-name="${esc(f.name)}"><div class="grow"><div class="row-title">${fmtDay(new Date(f.modifiedTime || f.createdTime))}</div><div class="row-sub">${fmtT(new Date(f.modifiedTime || f.createdTime))}${f.size ? ` · ${Math.max(1, Math.round(f.size / 1024))} KB` : ''}</div></div>${ICON.chev}</button>`).join('')}</div>` : '<div class="empty">עוד אין גיבויים בתיקייה MyShot בדרייב.</div>', '');
 }
 
+
+/* ---------- first launch: restore (Google Drive or a file) or start fresh, then offer the lock ---------- */
+const freshInstall = () => !S.core.settings.setup && !S.injections.items.length && !S.weights.items.length && !S.symptoms.items.length && !(S.core.supps || []).length && !Object.keys(S.food.days || {}).length;
+const wopt = (act, icon, title, sub, extra) => `<button class="wopt" data-act="${act}"${extra || ''}><span class="wopt-ico" aria-hidden="true">${icon}</span><span class="wopt-txt"><span class="row-title">${title}</span><span class="row-sub">${sub}</span></span></button>`;
+function openWelcome() {
+  F = { kind: 'welcome' };
+  const body = `<div class="onb-logo">${LOGO_MARK}${LOGO_WORD}</div>
+    <p class="muted center" style="margin:0 0 18px">יש לכם גיבוי מהטלפון הקודם או מהתקנה קודמת?</p>
+    <div class="welcome-opts" id="f-welcome">${welcomeChoicesHTML()}</div>`;
+  Sheet.open('ברוכים הבאים', body, '');
+}
+function welcomeChoicesHTML() {
+  return wopt('welcome-drive', icoCloud(), 'שחזור מ-Google Drive', GDrive.enabled() ? 'מתחברים, והאפליקציה מוצאת את הגיבוי האחרון בעצמה' : 'בוחרים את קובץ הגיבוי מתוך Drive')
+    + `<label class="wopt file-btn"><span class="wopt-ico" aria-hidden="true">${ICON.clip}</span><span class="wopt-txt"><span class="row-title">בחירת קובץ גיבוי</span><span class="row-sub">מהטלפון, מ-Drive או מכל מקום אחר</span></span><input type="file" accept="application/json,.json" data-file="welcome-import"></label>`
+    + wopt('welcome-new', ICON.plus, 'להתחיל מחדש', 'הגדרה קצרה של התרופה והמינון');
+}
+function welcomeBody(html) { const el = $('#f-welcome'); if (el) el.innerHTML = html; }
+function pickBackupFile() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json,.json'; inp.style.display = 'none';
+  document.body.appendChild(inp); inp.addEventListener('change', () => { const f = inp.files && inp.files[0]; inp.remove(); if (f) doImport(f, { fresh: true, after: afterFirstRestore }); });
+  Lock.away(); inp.click();
+}
+async function welcomeDrive() {
+  if (!GDrive.enabled()) { pickBackupFile(); return; }
+  welcomeBody('<div class="scan-wait"><div class="spin" aria-hidden="true"></div><p class="lead" style="margin:0">מחפש גיבוי ב-Google Drive…</p></div>');
+  let files;
+  try { files = await GDrive.findBackups(await GDrive.token(true)); }
+  catch (e) { if (F.kind !== 'welcome') return; if (e.code === 'cancel') { welcomeBody(welcomeChoicesHTML()); return; } welcomeBody(`<div class="note warn">${esc(driveErr(e))}</div>` + welcomeChoicesHTML()); return; }
+  if (F.kind !== 'welcome') return;
+  if (!files.length) { welcomeBody('<div class="note info">לא נמצא ב-Drive גיבוי שהאפליקציה שמרה. גיבוי ששמרתם דרך חלון השיתוף לא מופיע בחיפוש הזה, ואותו בוחרים ב״בחירת קובץ גיבוי״.</div>' + welcomeChoicesHTML()); return; }
+  const when = f => { const d = new Date(f.modifiedTime || f.createdTime); return `${fmtDay(d)}, ${fmtT(d)}`; };
+  const kb = f => f.size ? ` · ${Math.max(1, Math.round(f.size / 1024))} KB` : '';
+  const [first, ...rest] = files;
+  welcomeBody(`<div class="note info"><b>נמצא גיבוי מ${when(first)}</b>${kb(first)}</div>
+    <button class="btn block" data-act="welcome-restore" data-id="${esc(first.id)}" data-name="${esc(first.name)}">שחזור הגיבוי הזה</button>
+    ${rest.length ? `<p class="tiny muted" style="margin:12px 0 6px">או גיבוי קודם:</p><div class="group">${rest.slice(0, 6).map(f => `<button class="row" data-act="welcome-restore" data-id="${esc(f.id)}" data-name="${esc(f.name)}"><div class="grow"><div class="row-title">${when(f)}</div><div class="row-sub">${kb(f).replace(' · ', '')}</div></div>${ICON.chev}</button>`).join('')}</div>` : ''}
+    <button class="chip out" style="margin-top:12px" data-act="welcome-back">חזרה</button>`);
+}
+async function welcomeRestore(id, name) {
+  welcomeBody('<div class="scan-wait"><div class="spin" aria-hidden="true"></div><p class="lead" style="margin:0">משחזר את הגיבוי…</p></div>');
+  try { const t = await GDrive.download(id); await doImport(new File([t], name || 'backup.json', { type: 'application/json' }), { fresh: true, after: afterFirstRestore }); }
+  catch (e) { if (F.kind === 'welcome') welcomeBody(`<div class="note warn">${esc(driveErr(e))}</div>` + welcomeChoicesHTML()); }
+}
+function afterFirstRestore() { if (!S.core.settings.setup) openOnboarding(); else offerLock(); }
+// Offered once, after the first restore or the first setup.
+function offerLock() {
+  if (!Native.on || Lock.on() || Sheet.isOpen()) return;
+  try { if (localStorage.getItem('mj-lock-offer')) return; localStorage.setItem('mj-lock-offer', '1'); } catch (e) {}
+  F = { kind: 'lockoffer' };
+  Sheet.open('לנעול את MyShot?', `<p class="lead" style="margin-top:4px">יש כאן מידע רפואי אישי. אפשר לנעול את האפליקציה, כך שרק אתם תוכלו לפתוח אותה.</p>
+    <div class="welcome-opts">${wopt('offer-bio', icoFinger(), 'טביעת אצבע', 'ואם היא לא מזוהה, קוד הנעילה של הטלפון', ' id="offer-bio"')}${wopt('offer-pin', icoLock(), 'קוד', '4 עד 6 ספרות שתבחרו')}</div>
+    <p class="tiny muted" style="margin-top:12px">אפשר לשנות או לבטל בכל רגע בהגדרות ← פרטיות ונעילה.</p>`, '<button class="btn quiet" data-act="offer-skip">לא עכשיו</button>');
+  Bio.available().then(ok => { const b = $('#offer-bio'); if (b && !ok) b.remove(); });
+}
+
 /* ---------- photos through the native camera (Android) ---------- */
 const PHOTO_KINDS = ['meal', 'label', 'receipt', 'progress', 'supp'];
 function b64ToBlob(b64, format) {
@@ -1319,10 +1423,10 @@ function b64ToBlob(b64, format) {
 async function cameraBlob(C, camera) {
   const size = { quality: 78, width: 1600, height: 1600, correctOrientation: true };
   if (typeof C.getPhoto === 'function') {
-    const r = await C.getPhoto({ ...size, saveToGallery: false, resultType: 'base64', source: camera ? 'CAMERA' : 'PHOTOS' });
+    Lock.away(); const r = await C.getPhoto({ ...size, saveToGallery: false, resultType: 'base64', source: camera ? 'CAMERA' : 'PHOTOS' });
     return b64ToBlob(r.base64String, r.format);
   }
-  const r = camera ? await C.takePhoto(size) : await C.chooseFromGallery(size);
+  Lock.away(); const r = camera ? await C.takePhoto(size) : await C.chooseFromGallery(size);
   const x = (r && r.results && r.results[0]) || r || {}, src = x.webPath || x.path || x.uri;
   if (!src) throw new Error('no photo');
   const url = /^(https?|blob|data):/.test(src) ? src : window.Capacitor.convertFileSrc(src);
@@ -1382,7 +1486,7 @@ const NativeFiles = {
     const w = await FS.writeFile({ path: filename, data: b64, directory: 'CACHE' });
     const cancelled = e => /cancel/i.test(String(e && (e.message || e.errorMessage || e)));
     const dlg = App.saveTitle || 'שמירה או שליחה';
-    try { await Sh.share({ title: filename, files: [w.uri], dialogTitle: dlg }); }
+    Lock.away(); try { await Sh.share({ title: filename, files: [w.uri], dialogTitle: dlg }); }
     catch (e) {
       if (cancelled(e)) return { cancelled: true };
       try { await Sh.share({ title: filename, url: w.uri, dialogTitle: dlg }); } catch (e2) { if (cancelled(e2)) return { cancelled: true }; throw e2; }
@@ -1588,7 +1692,6 @@ function remindersBody() {
   const chipsSet = (k, opts, cur) => `<div class="chips">${opts.map(([v, l]) => `<button class="chip" data-act="rem-set" data-k="${k}" data-v="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
   const dayChips = (k, cur) => chipsSet(k, DAYS.map((n, i) => [i, DAYS_SHORT[i]]), cur);
   const row = (k, title, sub, extra) => `<div class="row col"><div class="rowline"><div class="grow"><div class="row-title">${title}</div><div class="row-sub">${sub}</div></div>${sw(k, title)}</div>${r[k] && extra ? `<div class="rem-extra">${extra}</div>` : ''}</div>`;
-  h += `<h2 class="h-section">פרטיות</h2><div class="group">${row('discreet', 'התראות דיסקרטיות', r.discreet ? 'במסך הנעילה מופיע רק ״תזכורת מ-MyShot״, בלי שם התרופה או המינון' : 'ההתראות מציגות את שם התרופה, המינון והפרטים', '')}</div>`;
   h += '<h2 class="h-section">תזכורות קבועות</h2><div class="group">';
   h += row('dose', weekly ? `יום ה${t.dose}` : `${t.dose} יומית`, weekly ? (hasDay() ? `כל יום ${DAYS[st.day]}` : 'לפי המנה האחרונה') : esc(m.name),
     timeIn('data-remset="time"', st.time || '09:00', 'שעה') + ((m.timesPerDay || 1) >= 2 && m.freq !== 'meals' ? timeIn('data-rem="time2"', r.time2, 'מנה שנייה') : ''));
@@ -1723,15 +1826,15 @@ async function nativeBoot() {
   if (AP) {
     try {
       AP.addListener('backButton', () => {
-        if (Sheet.isOpen()) { Sheet.close(); return; }
+        if (Sheet.isOpen()) { if (F && typeof F.back === 'function') { F.back(); return; } Sheet.close(); return; }
         if (App.tab === 'more' && App.more) { App.more = null; App.render(); window.scrollTo(0, 0); return; }
         if (App.tab !== 'home') { setTab('home', true); return; }
         AP.exitApp();
       });
       AP.addListener('appRestoredResult', ev => { try { restorePhoto(ev); } catch (e) {} });
       AP.addListener('appStateChange', st => {
-        if (st && st.isActive) { const lc = Lock.cfg(); if (Lock.on() && !Lock.locked && Date.now() - Lock.bgAt >= ((lc && lc.after) || 0) * 1000) Lock.show(); GDrive.auto(); nativeBars(); syncThemeBtn(); if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
-        else { Lock.bgAt = Date.now(); Sync.flushAll(); }
+        if (st && st.isActive) { Lock.onActive(); GDrive.auto(); nativeBars(); syncThemeBtn(); if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
+        else { Lock.onBackground(); Sync.flushAll(); }
       });
     } catch (e) {}
   }
@@ -3785,37 +3888,72 @@ function validMedForm(f) {
 }
 
 function openSettings() {
-  const st = S.core.settings, c = st.customMed || {};
-  F = { kind: 'set', med: st.med || 'mounjaro', day: hasDay() ? String(st.day) : 'none', time: st.time || '09:00', start: st.start || '', dose: st.dose, per: st.perPen || curMed().perPack || 4, arms: !!st.arms, theme: getTheme(), cmName: c.name || '', cmForm: c.form || 'pen', cmFreq: c.freq || 'weekly', cmDoses: (c.doses || []).join(', '), cmUnit: c.unit || 'מ״ג', num: ['dose'] };
-  if (Native.on) Object.assign(F, remToF());
-  if (BYOK_ON) { F.aiProv = AIKeys.read().provider; const k = AIKeys.read().keys[F.aiProv]; if (k && AIModels.stale(F.aiProv)) setTimeout(() => refreshAIModels(F.aiProv, k, true), 300); }
-  const storage = Backend.mode === 'cloud' ? 'הנתונים נשמרים באזור פרטי בחשבון שלך. אם תשתפו את הקישור, כל מי שיפתח אותו יראה רק את הנתונים של עצמו.' : (Native.on ? 'הנתונים נשמרים בטלפון הזה בלבד. הסרת האפליקציה או מחיקת הנתונים שלה תמחק גם אותם, לכן כדאי לייצא גיבוי מדי פעם.' : Local.db ? 'הנתונים נשמרים בדפדפן הזה בלבד. מחיקת נתוני הדפדפן תמחק גם אותם.' : 'אין כאן אפשרות שמירה, והנתונים יימחקו בסגירת הדף.');
-  const body = `
-    <h3 class="h-sub" style="margin-top:4px">התרופה</h3>
-    <div>${medChipsHTML(F.med)}</div>
-    <div id="f-medblock">${medBlockHTML(false)}</div>
-    ${Native.on ? `<h3 class="h-sub" style="margin-top:26px">תזכורות</h3><div class="group"><button class="row" data-act="rem-page">${icoBell()}<div class="grow"><div class="row-title">ניהול התזכורות</div><div class="row-sub">מה מזכירים, באיזו שעה, ותזכורות משלכם</div></div>${ICON.chev}</button></div>` : ''}${BYOK_ON ? aiSettingsHTML() : ''}${lockSettingsHTML()}
-    <h3 class="h-sub" style="margin-top:26px">יעדים</h3>
-    <div class="two"><label class="field"><span class="fl">מים (כוסות ביום)</span><input type="number" inputmode="numeric" min="1" max="20" id="f-water" value="${esc(st.water || 8)}"></label><label class="field"><span class="fl">חלבון (גרם ביום)</span><input type="number" inputmode="numeric" min="0" max="300" id="f-protein" value="${st.protein ? esc(st.protein) : ''}" placeholder="לא נקבע"></label></div>
-    <div class="two"><label class="field"><span class="fl">קלוריות ביום</span><input type="number" inputmode="numeric" min="0" max="6000" id="f-kcal" value="${st.kcal ? esc(st.kcal) : ''}" placeholder="לא נקבע"></label><label class="field"><span class="fl">סיבים (גרם ביום)</span><input type="number" inputmode="numeric" min="0" max="100" id="f-fiber" value="${st.fiber ? esc(st.fiber) : ''}" placeholder="לא נקבע"></label></div>
-    <div class="two"><label class="field"><span class="fl">גובה (ס״מ)</span><input type="number" inputmode="numeric" min="100" max="250" id="f-height" value="${st.height ? esc(st.height) : ''}"></label><label class="field"><span class="fl">יעד משקל (ק״ג)</span><input type="number" inputmode="decimal" step="0.1" id="f-goal" value="${st.goalKg ? esc(st.goalKg) : ''}"></label></div>
-    <div class="field"><span class="fl">מראה</span><div class="chips" role="group" aria-label="מראה"><button class="chip" data-pick="theme" data-val="auto" aria-pressed="${F.theme === 'auto'}">לפי המכשיר</button><button class="chip" data-pick="theme" data-val="light" aria-pressed="${F.theme === 'light'}">בהיר</button><button class="chip" data-pick="theme" data-val="dark" aria-pressed="${F.theme === 'dark'}">כהה</button></div></div>
-    <h3 class="h-sub" style="margin-top:26px">גיבוי ונתונים</h3>
-    <p class="small muted">${storage}</p>
-    ${driveSettingsHTML()}${Native.on ? `<div class="chips" style="margin-top:12px"><button class="chip" data-act="backup-drive">${icoCloud()} גיבוי ל-Google Drive</button></div><p class="tiny muted" style="margin-top:8px">נפתח חלון השיתוף של אנדרואיד: בוחרים Drive ואת התיקייה. כדי לשחזר, לוחצים ״שחזור מגיבוי״ ובוחרים את הקובץ מתוך Drive. גיבוי אחרון: ${lastBackupText()}.</p>` : ''}<div class="chips" style="margin-top:12px">${App.downloads ? `<button class="chip" data-act="export">${Native.on ? 'ייצוא לקובץ' : 'ייצוא גיבוי'}</button>` : ''}<label class="chip file-btn">${Native.on ? 'שחזור מגיבוי' : 'ייבוא גיבוי'}<input type="file" accept="application/json,.json" data-file="import"></label><button class="chip out" style="color:var(--alert)" data-act="wipe">מחיקת כל הנתונים</button></div>
+  const st = S.core.settings, m = curMed();
+  F = { kind: 'sethub', theme: getTheme() };
+  const row = (p, icon, title, sub) => `<button class="row" data-act="set-go" data-p="${p}"><span class="set-ico" aria-hidden="true">${icon}</span><div class="grow"><div class="row-title">${title}</div><div class="row-sub">${sub}</div></div>${ICON.chev}</button>`;
+  const medTxt = `${m.name}${st.dose ? ` · ${nf1(st.dose)} ${m.unit || 'מ״ג'}` : ''}`;
+  const goalsTxt = `${st.water || 8} כוסות מים${st.protein ? ` · חלבון ${st.protein} ג׳` : ''}${st.goalKg ? ` · יעד ${nf1(st.goalKg)} ק״ג` : ''}`;
+  const ai = BYOK_ON ? AIKeys.read() : null, aiTxt = ai ? `${AI_PROVIDERS[ai.provider].label} · ${ai.keys[ai.provider] ? 'מחובר' : 'אין מפתח'}` : '';
+  const lockTxt = { none: 'כבויה', pin: 'קוד', bio: 'טביעת אצבע' }[Lock.method()];
+  const g = GDrive.st(), backupTxt = GDrive.enabled() && GDrive.connected() ? `גיבוי אוטומטי ל-Drive${g.last ? ` · ${fmtDay(new Date(g.last))}` : ''}` : `גיבוי אחרון: ${lastBackupText()}`;
+  const body = `<div class="group">
+      ${row('med', ICON.syr, 'התרופה והמינון', esc(medTxt))}
+      ${Native.on ? `<button class="row" data-act="rem-page"><span class="set-ico" aria-hidden="true">${icoBell()}</span><div class="grow"><div class="row-title">תזכורות</div><div class="row-sub">${remActiveCount()} פעילות</div></div>${ICON.chev}</button>` : ''}
+      ${row('goals', ICON.pulse, 'יעדים', esc(goalsTxt))}
+    </div>
+    <div class="group" style="margin-top:14px">
+      ${BYOK_ON ? row('ai', ICON.spark, 'בינה מלאכותית', esc(aiTxt)) : ''}
+      ${row('privacy', icoLock(), 'פרטיות ונעילה', `נעילה: ${lockTxt}${Native.on ? ` · התראות ${remCfg().discreet ? 'דיסקרטיות' : 'מלאות'}` : ''}`)}
+      ${row('backup', icoCloud(), 'גיבוי ונתונים', esc(backupTxt))}
+    </div>
+    <div class="group" style="margin-top:14px"><div class="row col"><span class="row-title">מראה</span><div class="chips" role="group" aria-label="מראה"><button class="chip" data-pick="theme" data-val="auto" aria-pressed="${F.theme === 'auto'}">לפי המכשיר</button><button class="chip" data-pick="theme" data-val="light" aria-pressed="${F.theme === 'light'}">בהיר</button><button class="chip" data-pick="theme" data-val="dark" aria-pressed="${F.theme === 'dark'}">כהה</button></div></div></div>
     <p class="disclaimer" style="margin-top:20px">המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי.</p>
     <button class="credit-line" data-act="about">MyShot · גרסה ${APP_VERSION} · פותח על ידי רן יעקבי</button>`;
-  Sheet.open('הגדרות', body, '<button class="btn" data-act="set-save">שמירת ההגדרות</button>', sh => {
-    F.onChange = g => { if (g === 'theme') setTheme(F.theme); if (g === 'aiProv') { const b = $('#f-aiblock', sh); if (b) b.innerHTML = aiBlockHTML(); const k = AIKeys.read().keys[F.aiProv]; if (k && AIModels.stale(F.aiProv)) refreshAIModels(F.aiProv, k, true); } medFormChange(sh, g, false); };
-  });
+  Sheet.open('הגדרות', body, '', () => { F.onChange = g2 => { if (g2 === 'theme') setTheme(F.theme); }; });
 }
-function settingsSave() {
+function openSetPage(p) {
+  const st = S.core.settings, back = `<button class="set-back" data-act="set-back">${ICON.chevR}<span>הגדרות</span></button>`, toHub = () => openSettings();
+  const save = '<button class="btn" data-act="set-save">שמירה</button>';
+  if (p === 'med') {
+    const c = st.customMed || {};
+    F = { kind: 'set', page: 'med', back: toHub, med: st.med || 'mounjaro', day: hasDay() ? String(st.day) : 'none', time: st.time || '09:00', start: st.start || '', dose: st.dose, per: st.perPen || curMed().perPack || 4, arms: !!st.arms, cmName: c.name || '', cmForm: c.form || 'pen', cmFreq: c.freq || 'weekly', cmDoses: (c.doses || []).join(', '), cmUnit: c.unit || 'מ״ג', num: ['dose'] };
+    if (Native.on) Object.assign(F, remToF());
+    Sheet.open('התרופה והמינון', back + `<div>${medChipsHTML(F.med)}</div><div id="f-medblock">${medBlockHTML(false)}</div>`, save, sh => { F.onChange = g => medFormChange(sh, g, false); });
+  } else if (p === 'goals') {
+    F = { kind: 'setgoals', page: 'goals', back: toHub, tg: st.trainGoal || 2, sg: st.stepGoal || 7000, num: ['tg', 'sg'] };
+    const n = (id, label, val, attrs) => `<label class="field"><span class="fl">${label}</span><input type="number" ${attrs} id="${id}" value="${val ? esc(val) : ''}"></label>`;
+    Sheet.open('יעדים', back + `<h3 class="h-sub" style="margin-top:2px">תזונה ומים</h3>
+      <div class="two">${n('f-water', 'מים (כוסות ביום)', st.water || 8, 'inputmode="numeric" min="1" max="20"')}${n('f-protein', 'חלבון (גרם ביום)', st.protein, 'inputmode="numeric" min="0" max="300" placeholder="לא נקבע"')}</div>
+      <div class="two">${n('f-kcal', 'קלוריות ביום', st.kcal, 'inputmode="numeric" min="0" max="6000" placeholder="לא נקבע"')}${n('f-fiber', 'סיבים (גרם ביום)', st.fiber, 'inputmode="numeric" min="0" max="100" placeholder="לא נקבע"')}</div>
+      <h3 class="h-sub" style="margin-top:20px">גוף</h3>
+      <div class="two">${n('f-height', 'גובה (ס״מ)', st.height, 'inputmode="numeric" min="100" max="250"')}${n('f-goal', 'יעד משקל (ק״ג)', st.goalKg, 'inputmode="decimal" step="0.1"')}</div>
+      <h3 class="h-sub" style="margin-top:20px">פעילות</h3>
+      <div class="field"><span class="fl">אימוני כוח בשבוע</span><div class="chips" role="group" aria-label="אימוני כוח בשבוע">${[1, 2, 3, 4].map(v => `<button class="chip num" data-pick="tg" data-val="${v}" aria-pressed="${F.tg === v}">${v}</button>`).join('')}</div></div>
+      <div class="field"><span class="fl">צעדים ביום</span><div class="chips" role="group" aria-label="צעדים ביום">${[5000, 7000, 8000, 10000].map(v => `<button class="chip num" data-pick="sg" data-val="${v}" aria-pressed="${F.sg === v}">${nfi(v)}</button>`).join('')}</div></div>`, save);
+  } else if (p === 'ai') {
+    F = { kind: 'set', page: 'ai', back: toHub, aiProv: AIKeys.read().provider };
+    const k = AIKeys.read().keys[F.aiProv]; if (k && AIModels.stale(F.aiProv)) setTimeout(() => refreshAIModels(F.aiProv, k, true), 300);
+    Sheet.open('בינה מלאכותית', back + aiSettingsHTML().replace(/<h3[^>]*>בינה מלאכותית<\/h3>/, ''), save, sh => {
+      F.onChange = g => { if (g === 'aiProv') { const b = $('#f-aiblock', sh); if (b) b.innerHTML = aiBlockHTML(); const k2 = AIKeys.read().keys[F.aiProv]; if (k2 && AIModels.stale(F.aiProv)) refreshAIModels(F.aiProv, k2, true); } };
+    });
+  } else if (p === 'privacy') {
+    F = { kind: 'setpriv', page: 'privacy', back: toHub };
+    Sheet.open('פרטיות ונעילה', back + `<div id="f-priv">${privacyPageHTML()}</div>`, '');
+    if (Native.on) Bio.available().then(ok => { if (!ok && F.page === 'privacy') { const el = $('#f-priv'); if (el) el.innerHTML = privacyPageHTML(false); } });
+  } else if (p === 'backup') {
+    F = { kind: 'setbackup', page: 'backup', back: toHub };
+    const storage = Backend.mode === 'cloud' ? 'הנתונים נשמרים באזור פרטי בחשבון שלך.' : (Native.on ? 'הנתונים נשמרים בטלפון הזה בלבד. הסרת האפליקציה או מחיקת הנתונים שלה תמחק גם אותם, ולכן כדאי לגבות.' : Local.db ? 'הנתונים נשמרים בדפדפן הזה בלבד.' : 'אין כאן אפשרות שמירה, והנתונים יימחקו בסגירת הדף.');
+    Sheet.open('גיבוי ונתונים', back + `<p class="small muted" style="margin-top:2px">${storage}</p>${driveSettingsHTML()}
+      ${Native.on ? `<h3 class="h-sub" style="margin-top:20px">גיבוי ידני</h3><div class="chips"><button class="chip" data-act="backup-drive">${icoCloud()} גיבוי ל-Google Drive</button></div><p class="tiny muted" style="margin-top:8px">נפתח חלון השיתוף: בוחרים Drive ואת התיקייה. גיבוי אחרון: ${lastBackupText()}.</p>` : ''}
+      <h3 class="h-sub" style="margin-top:20px">קבצים</h3><div class="chips">${App.downloads ? `<button class="chip" data-act="export">${Native.on ? 'ייצוא לקובץ' : 'ייצוא גיבוי'}</button>` : ''}<label class="chip file-btn">${Native.on ? 'שחזור מגיבוי' : 'ייבוא גיבוי'}<input type="file" accept="application/json,.json" data-file="import"></label></div>
+      <h3 class="h-sub" style="margin-top:20px">מחיקה</h3><div class="chips"><button class="chip out" style="color:var(--alert)" data-act="wipe">מחיקת כל הנתונים</button></div>`, '');
+  }
+}
+function settingsSave() { if (F.page === 'goals') return goalsSave(); if (F.page === 'ai') return aiSave(); return medSave(); }
+function medSave() {
   const sh = $('#sheet'); readMedBlock(sh);
-  const water = Math.round(numVal($('#f-water', sh))), protein = Math.round(numVal($('#f-protein', sh))), goal = numVal($('#f-goal', sh));
-  const kcal = Math.round(numVal($('#f-kcal', sh))), fiber = Math.round(numVal($('#f-fiber', sh))), height = Math.round(numVal($('#f-height', sh)));
   const f = { ...F }; if (!validMedForm(f)) return;
   const m = formMed(), changed = f.med !== (S.core.settings.med || 'mounjaro');
-  const remNew = null, akey = $('#f-akey', sh) ? $('#f-akey', sh).value.trim() : '', amodel = F.aiModel === undefined ? null : String(F.aiModel || '');
   if (!mutate('core', c => {
     const s = c.settings;
     s.med = f.med; if (f.med === 'custom') s.customMed = customMedFromF(f);
@@ -3825,22 +3963,31 @@ function settingsSave() {
     s.dose = m.doses.includes(f.dose) ? f.dose : m.doses[0];
     const per = Math.round(parseFloat(f.per)); s.perPen = per > 0 && per <= 500 ? per : (m.perPack || 4);
     if (changed) c.pen = { opened: null, used: 0, spare: 0 };
-    s.arms = !!f.arms;
+    s.arms = !!f.arms; s.setup = true;
+  })) return;
+  toast(changed ? `עברתם ל${m.name}.` : 'נשמר'); openSettings();
+}
+function goalsSave() {
+  const sh = $('#sheet'), v = id => numVal($(id, sh));
+  const water = Math.round(v('#f-water')), protein = Math.round(v('#f-protein')), goal = v('#f-goal'), kcal = Math.round(v('#f-kcal')), fiber = Math.round(v('#f-fiber')), height = Math.round(v('#f-height'));
+  const tg = +F.tg, sg = +F.sg;
+  if (!mutate('core', c => {
+    const s = c.settings;
     s.water = water >= 1 && water <= 20 ? water : 8;
     s.protein = protein > 0 && protein <= 300 ? protein : 0;
     s.goalKg = goal >= 20 && goal <= 400 ? Math.round(goal * 10) / 10 : null;
     s.kcal = kcal > 0 && kcal <= 6000 ? kcal : 0; s.fiber = fiber > 0 && fiber <= 100 ? fiber : 0; s.height = height >= 100 && height <= 250 ? height : null;
-    s.setup = true;
-    if (remNew) s.rem = remNew;
+    s.trainGoal = tg >= 1 && tg <= 7 ? tg : 2; s.stepGoal = sg >= 1000 && sg <= 50000 ? sg : 7000;
   })) return;
-  let aiNote = '';
-  if (BYOK_ON && f.aiProv && AI_PROVIDERS[f.aiProv]) {
-    const c = AIKeys.read(); c.provider = f.aiProv; if (akey) c.keys[f.aiProv] = akey; if (amodel !== null) c.models[f.aiProv] = amodel;
-    AIKeys.write(c); AIKeys.setup();
-    if (akey || AIModels.stale(f.aiProv)) refreshAIModels(f.aiProv, c.keys[f.aiProv], true);
-    if (!c.keys[f.aiProv]) aiNote = ` בלי מפתח של ${AI_PROVIDERS[f.aiProv].label}, ניתוח התמונות כבוי.`;
-  }
-  Sheet.close(); toast((changed ? `עברתם ל${m.name}.` : 'ההגדרות נשמרו.') + aiNote);
+  toast('היעדים נשמרו'); openSettings();
+}
+function aiSave() {
+  const sh = $('#sheet'), f = { ...F }, akey = $('#f-akey', sh) ? $('#f-akey', sh).value.trim() : '', amodel = F.aiModel === undefined ? null : String(F.aiModel || '');
+  if (!BYOK_ON || !f.aiProv || !AI_PROVIDERS[f.aiProv]) { openSettings(); return; }
+  const c = AIKeys.read(); c.provider = f.aiProv; if (akey) c.keys[f.aiProv] = akey; if (amodel !== null) c.models[f.aiProv] = amodel;
+  AIKeys.write(c); AIKeys.setup();
+  if (akey || AIModels.stale(f.aiProv)) refreshAIModels(f.aiProv, c.keys[f.aiProv], true);
+  toast(c.keys[f.aiProv] ? 'נשמר' : `נשמר. בלי מפתח של ${AI_PROVIDERS[f.aiProv].label}, ניתוח התמונות כבוי.`); openSettings();
 }
 
 function openOnboarding() {
@@ -3877,7 +4024,7 @@ function onboardingSave() {
     s.setup = true; c.pen.spare = spare;
   });
   Sheet.close(); toast('הכול מוכן');
-  if (Native.on && Reminders.perm !== 'granted') setTimeout(() => Reminders.ask(), 700);
+  setTimeout(async () => { if (Native.on && Reminders.perm !== 'granted') { try { await Reminders.ask(); } catch (e) {} } offerLock(); }, 700);
 }
 
 /* ---------- pen ---------- */
@@ -4007,13 +4154,13 @@ async function buildBackupJSON() {
   return JSON.stringify({ app: 'mounjaro-journal', v: 2, appVersion: APP_VERSION, exported: new Date().toISOString(), docs: clone(S), images, photos });
 }
 async function doExport() { await saveFile(`myshot-backup-${todayStr()}.json`, await buildBackupJSON(), 'הגיבוי נשמר'); }
-async function doImport(file) {
+async function doImport(file, opts = {}) {
   if (!file) return;
   let data;
   try { data = JSON.parse(await file.text()); } catch (e) { toast('הקובץ לא נקרא. בחרו קובץ גיבוי של היומן.', 'alert'); return; }
   if (!data || data.app !== 'mounjaro-journal' || !data.docs || typeof data.docs !== 'object') { toast('זה לא קובץ גיבוי של היומן.', 'alert'); return; }
   if (!KEYS.every(k => Backend.canWrite(k))) { toast('הנתונים עדיין נטענים. נסו שוב בעוד רגע.', 'alert'); return; }
-  if (!(await confirmBox('הייבוא יחליף את כל הנתונים הנוכחיים בנתונים מהגיבוי. להמשיך?', 'ייבוא', false))) return;
+  if (!opts.fresh && !(await confirmBox('הייבוא יחליף את כל הנתונים הנוכחיים בנתונים מהגיבוי. להמשיך?', 'ייבוא', false))) return;
   let failed = 0;
   for (const [id, src] of Object.entries(data.images || {})) {
     if (!/^[a-z0-9]{6,40}$/i.test(id) || typeof src !== 'string' || !src.startsWith('data:image/') || src.length > 240000) continue;
@@ -4024,7 +4171,9 @@ async function doImport(file) {
     try { await Backend.setBlob('ph-' + id, { src: ph.src, at: new Date().toISOString() }); if (typeof ph.thumb === 'string' && ph.thumb.startsWith('data:image/') && ph.thumb.length < 100000) await Backend.setBlob('pt-' + id, { src: ph.thumb }); photoCache.set(id, ph.src); } catch (e) { failed++; }
   }
   for (const k of KEYS) { S[k] = merge(DEF[k], data.docs[k] || {}); Sync.save(k, true); }
-  Sheet.close(); App.render(); toast(failed ? `הגיבוי יובא, אבל ${failed} תמונות לא נשמרו.` : 'הגיבוי יובא');
+  Sheet.close(); App.render(); toast(failed ? `הגיבוי יובא, אבל ${failed} תמונות לא נשמרו.` : opts.fresh ? 'הגיבוי שוחזר ✓' : 'הגיבוי יובא');
+  if (Native.on) Reminders.soon(300);
+  if (opts.after) setTimeout(opts.after, 600);
 }
 async function doWipe() {
   if (!KEYS.every(k => Backend.canWrite(k))) { toast('הנתונים עדיין נטענים. נסו שוב בעוד רגע.', 'alert'); return; }
@@ -4603,11 +4752,11 @@ document.addEventListener('click', e => {
     case 'ai-models-refresh': { const k = ((($('#f-akey') || {}).value) || '').trim() || AIKeys.read().keys[F.aiProv]; if (k) refreshAIModels(F.aiProv, k, false); break; }
     case 'rem-page': openRemPage(); break;
     case 'theme-toggle': toggleTheme(a); break;
-    case 'gd-connect': case 'gd-now': { const first = d.act === 'gd-connect'; a.disabled = true; GDrive.backup(true).then(() => { toast(first ? 'מחובר. הגיבוי הראשון נשמר ב-Drive ✓' : 'הגיבוי נשמר ב-Drive ✓'); if (F.kind === 'set') openSettings(); }).catch(e => { a.disabled = false; if (e.code !== 'cancel') toast(driveErr(e), 'alert'); }); break; }
+    case 'gd-connect': case 'gd-now': { const first = d.act === 'gd-connect'; a.disabled = true; GDrive.backup(true).then(() => { toast(first ? 'מחובר. הגיבוי הראשון נשמר ב-Drive ✓' : 'הגיבוי נשמר ב-Drive ✓'); if (F.page === 'backup') openSetPage('backup'); }).catch(e => { a.disabled = false; if (e.code !== 'cancel') toast(driveErr(e), 'alert'); }); break; }
     case 'gd-auto': { const on = GDrive.st().auto === false; GDrive.save({ auto: on }); a.setAttribute('aria-checked', String(on)); break; }
     case 'gd-restore': driveRestorePick(); break;
     case 'gd-pick': { const id = d.id, name = d.name; GDrive.download(id).then(t => doImport(new File([t], name, { type: 'application/json' }))).catch(e => { if (e.code !== 'cancel') toast(driveErr(e), 'alert'); }); break; }
-    case 'gd-off': GDrive.disconnect().then(() => { toast('Drive נותק'); if (F.kind === 'set') openSettings(); }); break;
+    case 'gd-off': GDrive.disconnect().then(() => { toast('Drive נותק'); if (F.page === 'backup') openSetPage('backup'); }); break;
     case 'log-train': Sheet.close(); setTimeout(() => openTrainForm(), Sheet.isOpen() ? 200 : 0); break;
     case 'train-edit': openTrainForm(d.id); break;
     case 'train-save': trainSave(); break;
@@ -4617,12 +4766,29 @@ document.addEventListener('click', e => {
     case 'steps-edit': openStepsForm(); break;
     case 'steps-save': { const v = Math.round(numVal($('#f-steps'))); if (!(v >= 0 && v <= 100000)) { toast('מספר לא תקין', 'alert'); break; } setDay(r => { r.steps = v; }); Sheet.close(); toast('הצעדים נשמרו'); break; }
     case 'rem-tday': { const v = +d.v; remSave(r => { const cur = r.trainDays || []; r.trainDays = cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v].sort((p, q) => p - q); }); break; }
-    case 'lock-toggle': if (Lock.on()) { Sheet.close(); Lock.whenOpen(() => {}); (async () => { const c = Lock.cfg(); if (c && c.bio && await Bio.auth()) { Lock.off(); toast('הנעילה בוטלה'); return; } F = { kind: 'pinoff' }; Sheet.open('ביטול הנעילה', '<p class="lead" style="margin-top:4px">הקלידו את הקוד הנוכחי</p><label class="field"><input type="password" inputmode="numeric" maxlength="6" id="f-pin" dir="ltr" style="text-align:center;font-size:26px;letter-spacing:.4em"></label><div id="pin-err"></div>', '<button class="btn danger" data-act="pin-off">ביטול הנעילה</button>'); })(); } else openPinSheet('new'); break;
+    case 'set-go': openSetPage(d.p); break;
+    case 'welcome-drive': welcomeDrive(); break;
+    case 'welcome-new': Sheet.close(); setTimeout(() => openOnboarding(), 300); break;
+    case 'welcome-back': welcomeBody(welcomeChoicesHTML()); break;
+    case 'welcome-restore': welcomeRestore(d.id, d.name); break;
+    case 'offer-bio': Bio.auth('הפעלת פתיחה בטביעת אצבע').then(r => { if (r.ok) { Lock.setBio(); Sheet.close(); toast('הנעילה בטביעת אצבע פועלת'); } else if (r.code !== 'cancel') toast('טביעת האצבע לא הופעלה. אפשר לנסות שוב בהגדרות ← פרטיות ונעילה.', 'alert'); }); break;
+    case 'offer-pin': openPinSheet('new', () => Sheet.close()); break;
+    case 'offer-skip': Sheet.close(); break;
+    case 'set-back': if (F && typeof F.back === 'function') F.back(); else openSettings(); break;
+    case 'lock-method': { const v = d.v; if (v === Lock.method()) break; Lock.verify().then(async ok => {
+      if (!ok) return;
+      if (v === 'none') { Lock.off(); toast('הנעילה כבויה'); openSetPage('privacy'); return; }
+      if (v === 'pin') { openPinSheet('new'); return; }
+      if (!(await Bio.available())) { toast('אין בטלפון טביעת אצבע או נעילת מסך שאפשר להשתמש בהן.', 'alert'); openSetPage('privacy'); return; }
+      const r = await Bio.auth('הפעלת פתיחה בטביעת אצבע');
+      if (r.ok) { Lock.setBio(); toast('הנעילה בטביעת אצבע פועלת'); }
+      openSetPage('privacy');
+    }); break; }
     case 'pin-next': pinNext(); break;
-    case 'pin-off': { const v = (($('#f-pin') || {}).value || '').trim(); Lock.check(v).then(ok => { if (ok) { Lock.off(); Sheet.close(); toast('הנעילה בוטלה'); } else $('#pin-err').innerHTML = '<div class="note warn">קוד שגוי</div>'; }); break; }
-    case 'lock-change': Sheet.close(); setTimeout(() => openPinSheet('change'), 200); break;
+    case 'pin-verify': { const v = (($('#f-pin') || {}).value || '').trim(); Lock.check(v).then(ok => { if (ok) { const res = Lock.verifyRes; Lock.verifyRes = null; if (res) res(true); } else $('#pin-err').innerHTML = '<div class="note warn">קוד שגוי</div>'; }); break; }
+    case 'lock-change': Lock.verify().then(ok => { if (ok) openPinSheet('change'); }); break;
     case 'lock-after': { const v = +d.v; Lock.patch({ after: v }); a.parentElement.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(+c.dataset.v === v))); break; }
-    case 'lock-bio': { const c = Lock.cfg(), want = !(c && c.bio); if (!want) { Lock.patch({ bio: false }); a.setAttribute('aria-checked', 'false'); break; } Bio.available().then(async ok => { if (!ok) { toast('אין בטלפון טביעת אצבע או נעילת מסך שאפשר להשתמש בהן.', 'alert'); return; } if (await Bio.auth()) { Lock.patch({ bio: true }); a.setAttribute('aria-checked', 'true'); toast('פתיחה בטביעת אצבע פועלת'); } }); break; }
+    case 'discreet-tog': remSave(r => { r.discreet = !r.discreet; }); openSetPage('privacy'); break;
     case 'about': openAbout(); break;
     case 'about-ver': { const log = document.getElementById('about-log'); if (log) { log.hidden = !log.hidden; a.setAttribute('aria-expanded', String(!log.hidden)); } break; }
     case 'egg': eggTap(a); break;
@@ -4650,7 +4816,7 @@ document.addEventListener('click', e => {
       else nativePhoto('meal', true);
       break;
     }
-    case 'ai-setup': openSettings(); setTimeout(() => { const h = Array.from(document.querySelectorAll('#sheet h3')).find(x => x.textContent.includes('בינה מלאכותית')); if (h) h.scrollIntoView({ block: 'start' }); }, 80); break;
+    case 'ai-setup': openSetPage('ai'); break;
     case 'cnt': { F.count = Math.max(1, Math.min(10, (+F.count || 1) + +d.n)); const el = $('#f-cnt'); if (el) el.textContent = F.count; break; }
     case 'go-supps': Sheet.close(); setTab('supps'); break;
     case 'seg': if (d.g === 'food' && (d.k === 'meals' || d.k === 'supps')) App.foodSeg = d.k; if (d.g === 'track' && ['summary', 'symptoms', 'body', 'train'].includes(d.k)) App.trackSeg = d.k; App.render(); window.scrollTo(0, 0); break;
@@ -4663,6 +4829,7 @@ document.addEventListener('change', e => {
   if (!t || !t.matches) return;
   if (t.matches('input[data-file="receipt"]')) { const f = t.files && t.files[0]; handleReceiptFile(f); }
   else if (t.matches('input[data-file="import"]')) { const f = t.files && t.files[0]; t.value = ''; doImport(f); }
+  else if (t.matches('input[data-file="welcome-import"]')) { const f = t.files && t.files[0]; t.value = ''; doImport(f, { fresh: true, after: afterFirstRestore }); }
   else if (t.matches('input[data-file="meal"]')) { const f = t.files && t.files[0]; t.value = ''; handleMealPhoto(f); }
   else if (t.matches('input[data-file="label"]')) { const f = t.files && t.files[0]; t.value = ''; handleLabelPhoto(f); }
   else if (t.matches('input[data-file="progress"]')) { const f = t.files && t.files[0]; handleProgressFile(f); }
@@ -4732,7 +4899,7 @@ async function boot() {
     App.ready = true; App.render();
     if (Native.on) { Reminders.flush(); Reminders.soon(800); }
     if (App.afterReady) { const f = App.afterReady; App.afterReady = null; setTimeout(() => Lock.whenOpen(f), 300); }
-    if (Backend.loaded.core && !S.core.settings.setup && !App.readOnly && !App.slow) setTimeout(() => { if (!Sheet.isOpen()) openOnboarding(); }, 300);
+    if (Backend.loaded.core && !S.core.settings.setup && !App.readOnly && !App.slow) setTimeout(() => { if (!Sheet.isOpen()) (freshInstall() ? openWelcome() : openOnboarding()); }, 300);
   };
   if (Backend.mode === 'cloud') Backend.startCloud(done);
   else { await Backend.loadLocal(); done(); }
