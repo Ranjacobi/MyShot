@@ -822,6 +822,79 @@ async def english_guide_about_and_report(b):
         await ctx.close()
 
 
+async def lang_end_to_end(b, lang, home, settings):
+    pre = "if (!localStorage.getItem('__lang')) { localStorage.setItem('mj-lang', '%s'); localStorage.setItem('__lang', '1'); }\n" % lang
+    ctx, page, errs = await open_app(b, BIO, pre=FRESH + pre)
+    try:
+        await tick(page, 3)
+        check(await page.evaluate("document.documentElement.lang") == lang and await page.evaluate("document.documentElement.dir") == "ltr", f"{lang}: wrong lang or direction")
+        found = {"welcome": await hebrew_on_screen(page)}
+        await page.click('[data-act="welcome-new"]'); await tick(page, 3)
+        await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
+        if await page.locator('[data-act="offer-skip"]').count(): await page.click('[data-act="offer-skip"]'); await tick(page, 2)
+        for tab in ["home", "shots", "food", "track", "more"]:
+            await page.click(f'.tab[data-tab="{tab}"]'); await tick(page, 2); found[tab] = await hebrew_on_screen(page)
+        await page.click('.tab[data-tab="food"]'); await tick(page, 1); await page.click('[data-act="seg"][data-k="supps"]'); await tick(page, 2); found["supplements"] = await hebrew_on_screen(page)
+        await page.click('.tab[data-tab="track"]'); await tick(page, 1)
+        for seg in ["symptoms", "body", "train"]:
+            await page.click(f'[data-act="seg"][data-k="{seg}"]'); await tick(page, 2); found["track/" + seg] = await hebrew_on_screen(page)
+        await page.click('.tab[data-tab="more"]'); await tick(page, 2)
+        await page.click('.row[data-act="more-go"][data-k="guide"]'); await tick(page, 2)
+        await page.evaluate("document.querySelectorAll('#app details').forEach(d => d.open = true)"); await tick(page, 2); found["guide"] = await hebrew_on_screen(page)
+        await open_reminders(page); found["reminders"] = await hebrew_on_screen(page)
+        await page.click('[data-act="settings"]'); await tick(page, 2); found["settings"] = await hebrew_on_screen(page)
+        check(settings in await page.inner_text("#sheet .sheet-title"), f"{lang}: settings title is not translated")
+        for p in ["med", "goals", "privacy", "backup"]:
+            await page.click(f'[data-act="set-go"][data-p="{p}"]'); await tick(page, 2); found["settings/" + p] = await hebrew_on_screen(page)
+            await page.click('[data-act="set-back"]'); await tick(page, 2)
+        tabs = await page.evaluate("document.querySelector('.tabs').textContent")
+        check(home in tabs, f"{lang}: the tab bar is not translated: {tabs.split()}")
+        bad = {k: v for k, v in found.items() if v}
+        check(not bad, f"{lang}: Hebrew left: {bad}")
+        notes = await page.evaluate("__ln.scheduled.map(n => n.title + ' ' + n.body)")
+        check(notes and not [t for t in notes if __import__('re').search('[\u0590-\u05FF]', t)], f"{lang}: notifications with Hebrew: {notes[:2]}")
+        check(not errs, f"{lang}: JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def russian_interface(b):
+    await lang_end_to_end(b, "ru", "Главная", "Настройки")
+    ctx, page, errs = await open_app(b, "", pre="if (!localStorage.getItem('__lang')) { localStorage.setItem('mj-lang', 'ru'); localStorage.setItem('__lang', '1'); }\n")
+    try:
+        tabs = await page.evaluate("document.querySelector('.tabs').textContent")
+        check("Инъекции" in tabs and "Инъекций" not in tabs, f"ru: the injections tab label has the counting form: {tabs.split()}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def spanish_interface(b):
+    await lang_end_to_end(b, "es", "Inicio", "Ajustes")
+
+
+@test
+async def french_interface(b):
+    await lang_end_to_end(b, "fr", "Accueil", "Réglages")
+
+
+@test
+async def languages_follow_the_phone(b):
+    for locale, want in [("ru-RU", "ru"), ("es-ES", "es"), ("fr-FR", "fr"), ("de-DE", "en"), ("he-IL", "he")]:
+        ctx = await b.new_context(viewport={"width": 390, "height": 844}, locale=locale, timezone_id="Asia/Jerusalem", reduced_motion="reduce")
+        page = await ctx.new_page()
+        await page.clock.install(time=__import__('datetime').datetime(2026, 11, 13, 10, 30))
+        await page.route("**/fonts.g*/**", lambda r: r.abort())
+        await ctx.add_init_script(PRE + FRESH + MOCK + CAP)
+        try:
+            await page.goto(URL, wait_until="domcontentloaded"); await page.clock.run_for(1500); await tick(page, 8); await settle(page, 0.5, 6)
+            got = await page.evaluate("localStorage.getItem('mj-lang')")
+            check(got == want, f"phone {locale}: got {got}, expected {want}")
+        finally:
+            await ctx.close()
+
+
 # ---------------------------------------------------------------- runner
 
 async def main():

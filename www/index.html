@@ -554,12 +554,17 @@ html.is-locked body>*:not(#lock){visibility:hidden}
 
 <script src="google-config.js"></script>
 <script src="i18n-en.js"></script>
+<script src="i18n-ru.js"></script>
+<script src="i18n-es.js"></script>
+<script src="i18n-fr.js"></script>
 <script>
 (() => {
 // ---- language: Hebrew is the source text; English comes from i18n-en.js. In Hebrew, _tx() returns the text unchanged. ----
-const LANG = (() => { try { const v = localStorage.getItem('mj-lang'); if (v === 'en' || v === 'he') return v; } catch (e) {} return 'he'; })();
-const EN = LANG === 'en', OUT_LANG = EN ? 'English' : 'Hebrew';
-const EN_DICT = (EN && window.MYSHOT_EN) || {};
+const LANGS = ['he', 'en', 'ru', 'es', 'fr'];
+const LANG = (() => { try { const v = localStorage.getItem('mj-lang'); if (LANGS.includes(v)) return v; } catch (e) {} return 'he'; })();
+// EN = a translated, left-to-right language (English, Russian, Spanish or French)
+const EN = LANG !== 'he', OUT_LANG = { he: 'Hebrew', en: 'English', ru: 'Russian', es: 'Spanish', fr: 'French' }[LANG];
+const EN_DICT = EN ? Object.assign({}, window.MYSHOT_EN || {}, LANG !== 'en' ? (window['MYSHOT_' + LANG.toUpperCase()] || {}) : {}) : {};
 const _lk = s => String(s).replace(/\s+/g, ' ').trim();
 function _tx(strings, ...vals) {
   const edge = (src, t) => src.match(/^\s*/)[0] + t + src.match(/\s*$/)[0];
@@ -571,9 +576,9 @@ function _tx(strings, ...vals) {
   return t === undefined ? he : edge(he, t.replace(/\{(\d+)\}/g, (m, i) => vals[+i]));
 }
 if (EN) {
-  document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr';
+  document.documentElement.lang = LANG; document.documentElement.dir = 'ltr';
   const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let tn;
-  while ((tn = tw.nextNode())) { if (/^(SCRIPT|STYLE)$/.test(tn.parentNode.nodeName)) continue; const k = _lk(tn.nodeValue); if (k && EN_DICT[k] !== undefined) { let t = EN_DICT[k]; if (tn.parentElement && tn.parentElement.closest('.tabs')) t = t.charAt(0).toUpperCase() + t.slice(1); tn.nodeValue = tn.nodeValue.replace(tn.nodeValue.trim(), t); } }
+  while ((tn = tw.nextNode())) { if (/^(SCRIPT|STYLE)$/.test(tn.parentNode.nodeName)) continue; const k = _lk(tn.nodeValue); if (k && EN_DICT[k] !== undefined) { let t = EN_DICT[k]; if (tn.parentElement && tn.parentElement.closest('.tabs')) t = LANG === 'ru' && ({ 'инъекций': 'Инъекции', 'доз': 'Дозы' })[t] || t.charAt(0).toUpperCase() + t.slice(1); tn.nodeValue = tn.nodeValue.replace(tn.nodeValue.trim(), t); } }
   document.querySelectorAll('[aria-label],[title],[placeholder]').forEach(el => { for (const a of ['aria-label', 'title', 'placeholder']) { const v = el.getAttribute(a); if (v && EN_DICT[_lk(v)] !== undefined) el.setAttribute(a, EN_DICT[_lk(v)]); } });
 }
 
@@ -802,8 +807,9 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.8.0';
 const CHANGELOG = [
+  ['1.8.0', _tx('רוסית, ספרדית וצרפתית בממשק, והתוכן הרפואי באנגלית')],
   ['1.7.1', _tx('המדריך הרפואי, כללי התרופות, הטיפים לתוספים ודוח ה-PDF באנגלית')],
   ['1.7.0', _tx('ממשק באנגלית: בחירת שפה בהגדרות ובמסך הפתיחה, והתאמה אוטומטית לשפת הטלפון בהתקנה חדשה')],
   ['1.6.2', _tx('בפתיחה הראשונה: שחזור מ-Google Drive, בחירת קובץ גיבוי או התחלה חדשה, והצעה לנעול את האפליקציה')],
@@ -1388,10 +1394,12 @@ async function driveRestorePick() {
 /* ---------- first launch: restore (Google Drive or a file) or start fresh, then offer the lock ---------- */
 const freshInstall = () => !S.core.settings.setup && !S.injections.items.length && !S.weights.items.length && !S.symptoms.items.length && !(S.core.supps || []).length && !Object.keys(S.food.days || {}).length;
 const wopt = (act, icon, title, sub, extra) => `<button class="wopt" data-act="${act}"${extra || ''}><span class="wopt-ico" aria-hidden="true">${icon}</span><span class="wopt-txt"><span class="row-title">${title}</span><span class="row-sub">${sub}</span></span></button>`;
+const LANG_NAMES = { he: 'עברית', en: 'English', ru: 'Русский', es: 'Español', fr: 'Français' };
+const LANG_CHIPS = () => LANGS.map(l => `<button class="chip" data-act="set-lang" data-v="${l}" lang="${l}" aria-pressed="${LANG === l}">${LANG_NAMES[l]}</button>`).join('');
 function openWelcome() {
   F = { kind: 'welcome' };
   const body = `<div class="onb-logo">${LOGO_MARK}${LOGO_WORD}</div>
-    <div class="chips" role="group" aria-label="שפה · Language" style="justify-content:center;margin:-4px 0 14px"><button class="chip" data-act="set-lang" data-v="he" aria-pressed="${LANG === 'he'}">עברית</button><button class="chip" data-act="set-lang" data-v="en" aria-pressed="${LANG === 'en'}">English</button></div>
+    <div class="chips" role="group" aria-label="שפה · Language" style="justify-content:center;margin:-4px 0 14px">${LANG_CHIPS()}</div>
     <p class="muted center" style="margin:0 0 18px">${_tx`יש לכם גיבוי מהטלפון הקודם או מהתקנה קודמת?`}</p>
     <div class="welcome-opts" id="f-welcome">${welcomeChoicesHTML()}</div>`;
   Sheet.open(_tx('ברוכים הבאים'), body, '');
@@ -3110,7 +3118,9 @@ const SLOT_ORDER = ['morning', 'noon', 'evening', 'night', 'workout'];
 const FORMS = { pill: [_tx('כדור'), _tx('כדורים'), 'm'], capsule: [_tx('כמוסה'), _tx('כמוסות'), 'f'], chew: [_tx('טבליה'), _tx('טבליות'), 'f'], powder: [_tx('מנה'), _tx('מנות'), 'f'], shake: [_tx('שייק'), _tx('שייקים'), 'm'], drops: [_tx('מנה'), _tx('מנות'), 'f'], other: [_tx('יחידה'), _tx('יחידות'), 'f'] };
 const FORM_L = { pill: _tx('כדור'), capsule: _tx('כמוסה'), chew: _tx('טבליית לעיסה'), powder: _tx('אבקה'), shake: _tx('שייק'), drops: _tx('טיפות'), other: _tx('אחר') };
 const FOOD = { with: _tx('עם אוכל'), fat: _tx('עם ארוחה שיש בה שומן'), empty: _tx('על קיבה ריקה'), any: _tx('לא משנה') };
-function unitsTxt(form, n) { const f = FORMS[form] || FORMS.other; n = +n || 0; if (EN) return n === 0.5 ? `half a ${f[0]}` : n === 1 ? `1 ${f[0]}` : `${nf1(n)} ${f[1]}`; if (n === 1) return `${f[0]} ${f[2] === 'm' ? _tx('אחד') : _tx('אחת')}`; if (n === 0.5) return `${_tx`חצי ${f[0]}`}`; return `${nf1(n)} ${f[1]}`; }
+const FORMS_RU = { pill: ['таблетка', 'таблетки', 'таблеток'], capsule: ['капсула', 'капсулы', 'капсул'], chew: ['жевательная таблетка', 'жевательные таблетки', 'жевательных таблеток'], powder: ['порция', 'порции', 'порций'], shake: ['коктейль', 'коктейля', 'коктейлей'], drops: ['порция', 'порции', 'порций'], other: ['штука', 'штуки', 'штук'] };
+const ruForm = (n, f) => { const a = Math.abs(n) % 100, b = a % 10; return !Number.isInteger(n) ? f[1] : a > 10 && a < 20 ? f[2] : b === 1 ? f[0] : b >= 2 && b <= 4 ? f[1] : f[2]; };
+function unitsTxt(form, n) { const f = FORMS[form] || FORMS.other; n = +n || 0; if (LANG === 'ru') { const r = FORMS_RU[form] || FORMS_RU.other; return n === 0.5 ? `½ ${r[1]}` : `${nf1(n)} ${ruForm(n, r)}`; } if (EN) return n === 0.5 ? `half a ${f[0]}` : n === 1 ? `1 ${f[0]}` : `${nf1(n)} ${f[1]}`; if (n === 1) return `${f[0]} ${f[2] === 'm' ? _tx('אחד') : _tx('אחת')}`; if (n === 0.5) return `${_tx`חצי ${f[0]}`}`; return `${nf1(n)} ${f[1]}`; }
 const SUPP_PRESET = {
   'מולטי-ויטמין': { form: 'pill', slots: ['morning'], food: 'with', note: _tx('בשעה אחרת מתוסף הסידן') },
   'ויטמין D': { form: 'pill', slots: ['evening'], food: 'with', note: _tx('עם ארוחה שיש בה מעט שומן') },
@@ -3278,7 +3288,7 @@ function suppScanPrompt(m, others) {
 Their other supplements: ${others.length ? others.join(', ') : 'none'}.
 Read the label carefully and return one JSON object:
 {"isSupplement": true or false,
- "name": product name, short (max 40 chars), ${EN ? 'in English' : 'in Hebrew if the label is Hebrew, otherwise as printed'},
+ "name": product name, short (max 40 chars), ${EN ? `in ${OUT_LANG}` : 'in Hebrew if the label is Hebrew, otherwise as printed'},
  "brand": brand or "",
  "form": one of "pill","capsule","chew","powder","shake","drops","other",
  "amount": the main active amount per serving as printed (e.g. "2000 IU", "500 mg"), or "",
@@ -3464,7 +3474,7 @@ App.render = function () {
   $('#app').innerHTML = html;
   $$('.tab').forEach(b => { if (b.dataset.tab === App.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   const tb = $('.tab[data-tab="shots"]');
-  if (tb) { const tt = T(), sp = tb.querySelector('span'), lbl = EN ? tt.tab.charAt(0).toUpperCase() + tt.tab.slice(1) : tt.tab; if (sp.textContent !== lbl) { sp.textContent = lbl; tb.querySelector('svg').innerHTML = tt.pen ? '<path d="M18 2l4 4M17 7l3-3M19 9L8.7 19.3a2.4 2.4 0 0 1-3.4 0l-.6-.6a2.4 2.4 0 0 1 0-3.4L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/>' : '<path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7zM8.5 8.5l7 7"/>'; } }
+  if (tb) { const tt = T(), sp = tb.querySelector('span'), lbl = LANG === 'ru' ? ({ 'инъекций': 'Инъекции', 'доз': 'Дозы' })[tt.tab] || tt.tab : EN ? tt.tab.charAt(0).toUpperCase() + tt.tab.slice(1) : tt.tab; if (sp.textContent !== lbl) { sp.textContent = lbl; tb.querySelector('svg').innerHTML = tt.pen ? '<path d="M18 2l4 4M17 7l3-3M19 9L8.7 19.3a2.4 2.4 0 0 1-3.4 0l-.6-.6a2.4 2.4 0 0 1 0-3.4L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/>' : '<path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7zM8.5 8.5l7 7"/>'; } }
   syncThemeBtn();
   hydrateThumbs();
 };
@@ -3934,7 +3944,7 @@ function openSettings() {
       ${row('backup', icoCloud(), _tx('גיבוי ונתונים'), esc(backupTxt))}
     </div>
     <div class="group" style="margin-top:14px"><div class="row col"><span class="row-title">${_tx`מראה`}</span><div class="chips" role="group" aria-label="${_tx`מראה`}"><button class="chip" data-pick="theme" data-val="auto" aria-pressed="${F.theme === 'auto'}">${_tx`לפי המכשיר`}</button><button class="chip" data-pick="theme" data-val="light" aria-pressed="${F.theme === 'light'}">${_tx`בהיר`}</button><button class="chip" data-pick="theme" data-val="dark" aria-pressed="${F.theme === 'dark'}">${_tx`כהה`}</button></div></div></div>
-    <div class="group" style="margin-top:14px"><div class="row col"><span class="row-title">שפה · Language</span><div class="chips" role="group" aria-label="שפה · Language"><button class="chip" data-act="set-lang" data-v="he" aria-pressed="${LANG === 'he'}">עברית</button><button class="chip" data-act="set-lang" data-v="en" aria-pressed="${LANG === 'en'}">English</button></div></div></div>
+    <div class="group" style="margin-top:14px"><div class="row col"><span class="row-title">שפה · Language</span><div class="chips" role="group" aria-label="שפה · Language">${LANG_CHIPS()}</div></div></div>
     <p class="disclaimer" style="margin-top:20px">${_tx`המידע באפליקציה כללי ואינו מחליף ייעוץ רפואי.`}</p>
     <button class="credit-line" data-act="about">${_tx`MyShot · גרסה ${APP_VERSION} · פותח על ידי רן יעקבי`}</button>`;
   Sheet.open(_tx('הגדרות'), body, '', () => { F.onChange = g2 => { if (g2 === 'theme') setTheme(F.theme); }; });
@@ -4247,14 +4257,14 @@ function symCustomAdd() {
 /* ---------- meals & recipes ---------- */
 const nowHM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const PHOTO_PROMPT = `The photo shows a meal or a plate of food, probably in Israel. Identify each distinct food or drink, estimate the portion that is visible, and estimate its nutrition for that portion.
-Reply with only JSON in this shape: {"items":[{"name":"${EN ? 'food name in English' : 'שם המאכל בעברית'}","qty":"${EN ? 'estimated amount in English, e.g. 1 cup or 150 g' : 'כמות משוערת בעברית, למשל: כוס או 150 גרם'}","kcal":250,"p":12,"c":20,"f":10,"fib":3}]}
+Reply with only JSON in this shape: {"items":[{"name":"${EN ? `food name in ${OUT_LANG}` : 'שם המאכל בעברית'}","qty":"${EN ? `estimated amount in ${OUT_LANG}, e.g. 1 cup or 150 g` : 'כמות משוערת בעברית, למשל: כוס או 150 גרם'}","kcal":250,"p":12,"c":20,"f":10,"fib":3}]}
 kcal is calories; p, c, f and fib are grams of protein, carbohydrate, fat and dietary fiber. Use whole numbers. If there is no food in the photo, reply {"items":[]}.`;
 const LABEL_PROMPT = `The photo shows the nutrition facts label of a food product. Israeli labels are usually in Hebrew and give values per 100 g or per 100 ml. Read the values per 100 g or ml, and the serving size in grams if it is printed.
-Reply with only JSON in this shape: {"name":"${EN ? 'product name in English' : 'שם המוצר בעברית אם מופיע'}","serving_g":30,"per100":{"kcal":0,"p":0,"c":0,"f":0,"fib":0}}
+Reply with only JSON in this shape: {"name":"${EN ? `product name in ${OUT_LANG}` : 'שם המוצר בעברית אם מופיע'}","serving_g":30,"per100":{"kcal":0,"p":0,"c":0,"f":0,"fib":0}}
 kcal is calories; p, c, f and fib are grams of protein, carbohydrate, fat and dietary fiber. Use null for any value you cannot read.`;
-const TEXT_PROMPT = text => `Someone on a weight-management medication describes in ${EN ? 'English or Hebrew' : 'Hebrew'} what they ate: """${text}"""
+const TEXT_PROMPT = text => `Someone on a weight-management medication describes in ${EN ? `${OUT_LANG}, English or Hebrew` : 'Hebrew'} what they ate: """${text}"""
 Split it into separate foods and drinks. If an amount is not given, assume a typical Israeli portion. Estimate the nutrition of each.
-Reply with only JSON in this shape: {"items":[{"name":"${EN ? 'food name in English' : 'שם המאכל בעברית'}","qty":"${EN ? 'amount in English' : 'כמות בעברית'}","kcal":250,"p":12,"c":20,"f":10,"fib":3}]}
+Reply with only JSON in this shape: {"items":[{"name":"${EN ? `food name in ${OUT_LANG}` : 'שם המאכל בעברית'}","qty":"${EN ? `amount in ${OUT_LANG}` : 'כמות בעברית'}","kcal":250,"p":12,"c":20,"f":10,"fib":3}]}
 kcal is calories; p, c, f and fib are grams of protein, carbohydrate, fat and dietary fiber. Use whole numbers.`;
 function parseAIItems(res) { const arr = res && Array.isArray(res.items) ? res.items : Array.isArray(res) ? res : []; return arr.filter(x => x && typeof x.name === 'string' && x.name.trim()).slice(0, 15).map(x => cleanItem({ ...x, m: 1 })); }
 function favServingItems(fv) { const sv = Math.max(1, +fv.servings || 1); return (fv.items || []).map(it => { const v = itemVals(it); return cleanItem({ name: it.name, qty: sv > 1 ? `${_tx`מנה אחת מתוך ${sv}`}` : it.qty, kcal: v.kcal / sv, p: v.p / sv, c: v.c / sv, f: v.f / sv, fib: v.fib / sv, m: 1 }); }); }
@@ -4795,7 +4805,7 @@ document.addEventListener('click', e => {
     case 'steps-save': { const v = Math.round(numVal($('#f-steps'))); if (!(v >= 0 && v <= 100000)) { toast(_tx('מספר לא תקין'), 'alert'); break; } setDay(r => { r.steps = v; }); Sheet.close(); toast(_tx('הצעדים נשמרו')); break; }
     case 'rem-tday': { const v = +d.v; remSave(r => { const cur = r.trainDays || []; r.trainDays = cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v].sort((p, q) => p - q); }); break; }
     case 'set-go': openSetPage(d.p); break;
-    case 'set-lang': { const v = d.v === 'en' ? 'en' : 'he'; if (v === LANG) break; try { localStorage.setItem('mj-lang', v); } catch (e) {} try { Sync.flushAll(); } catch (e) {} setTimeout(() => location.reload(), 150); break; }
+    case 'set-lang': { const v = LANGS.includes(d.v) ? d.v : 'he'; if (v === LANG) break; try { localStorage.setItem('mj-lang', v); } catch (e) {} try { Sync.flushAll(); } catch (e) {} setTimeout(() => location.reload(), 150); break; }
     case 'welcome-drive': welcomeDrive(); break;
     case 'welcome-new': Sheet.close(); setTimeout(() => openOnboarding(), 300); break;
     case 'welcome-back': welcomeBody(welcomeChoicesHTML()); break;
@@ -4928,7 +4938,7 @@ async function boot() {
     App.ready = true; App.render();
     if (Native.on) { Reminders.flush(); Reminders.soon(800); }
     if (App.afterReady) { const f = App.afterReady; App.afterReady = null; setTimeout(() => Lock.whenOpen(f), 300); }
-    try { if (!localStorage.getItem('mj-lang')) { const want = freshInstall() && !/^(he|iw)\b/i.test(navigator.language || '') ? 'en' : 'he'; localStorage.setItem('mj-lang', want); if (want !== LANG) { location.reload(); return; } } } catch (e) {}
+    try { if (!localStorage.getItem('mj-lang')) { const pl = String(navigator.language || '').toLowerCase().slice(0, 2), want = !freshInstall() || pl === 'he' || pl === 'iw' ? 'he' : (LANGS.includes(pl) ? pl : 'en'); localStorage.setItem('mj-lang', want); if (want !== LANG) { location.reload(); return; } } } catch (e) {}
     if (Backend.loaded.core && !S.core.settings.setup && !App.readOnly && !App.slow) setTimeout(() => { if (!Sheet.isOpen()) (freshInstall() ? openWelcome() : openOnboarding()); }, 300);
   };
   if (Backend.mode === 'cloud') Backend.startCloud(done);

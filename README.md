@@ -69,9 +69,13 @@ Manage them on the **עוד → תזכורות** screen: switch each type on or 
 
 ## Language
 
-**Settings → שפה · Language** switches between **עברית** and **English**; the app reloads in the chosen language. The same choice appears on the welcome screen. A new install follows the phone's language (a Hebrew phone gets Hebrew, anything else English); an existing install stays in Hebrew until you switch.
+**Settings → שפה · Language** switches between **עברית**, **English**, **Русский**, **Español** and **Français**; the app reloads in the chosen language. The same choice appears on the welcome screen. A new install follows the phone's language (Hebrew, Russian, Spanish or French, and English for anything else); an existing install stays in Hebrew until you switch.
 
-In English the layout runs left to right, and notifications and AI answers (meal and food names, supplement explanations, meal ideas) are in English too. The medical guide, the medication and missed-dose rules, the supplement tips and the PDF report (laid out left to right) are in English too. Where the Hebrew names an Israeli service, the English says it generally and gives the Israeli number in parentheses, for example “your local emergency number (in Israel: MDA 101)”. Text you typed yourself, such as supplement names and notes, stays as you wrote it. The English text lives in `www/i18n-en.js`, keyed by the Hebrew source text.
+- **English** is complete: the interface, the medical guide, the medication and missed-dose rules, the supplement tips and the PDF report (laid out left to right). Where the Hebrew names an Israeli service, the English says it generally and gives the Israeli number in parentheses, for example “your local emergency number (in Israel: MDA 101)”.
+- **Russian, Spanish and French** cover the interface: screens, buttons, settings, notifications and messages, and AI answers (meal and food names, supplement explanations, meal ideas) come back in the chosen language. **The medical content stays in English** on purpose: the guide, dose and missed-dose rules, warning signs, supplement safety rules, the duplicate-dose warnings and the PDF report. Anything without a translation falls back to English, then to Hebrew.
+- Text you typed yourself, such as supplement names and notes, stays as you wrote it.
+
+The translations live in `www/i18n-en.js`, `i18n-ru.js`, `i18n-es.js` and `i18n-fr.js`, keyed by the Hebrew source text. They were made without a native-speaker review, so have one done before publishing in those markets.
 
 ## First launch
 
@@ -137,7 +141,7 @@ Never commit the release keystore; `.gitignore` already excludes `*.jks`. The pa
 
 ## Automated checks
 
-Every push first runs `tests/run_tests.py` in GitHub Actions (the **test** job): the app loads in headless Chromium with the Android plugins, AI providers and Google Drive mocked, and 29 checks cover reminders and discreet notifications, logging a dose from a notification (and the duplicate-dose guard), the back button, backup and restore, receipt and meal recognition, the model list and fallback, supplement scanning and its safety rules, the meal-to-supplement prompt, the app lock with a PIN and with fingerprint, the settings pages, the first-launch restore (Drive, a file, or starting fresh) and the lock offer, the English interface (no Hebrew left on any screen, the phone's language on a new install, switching back and forth, the guide and the PDF report), training and steps, Drive backup and retention, and layout at 360 px. **The APK is built only if every check passes**, so an update that breaks something never reaches the phone.
+Every push first runs `tests/run_tests.py` in GitHub Actions (the **test** job): the app loads in headless Chromium with the Android plugins, AI providers and Google Drive mocked, and 33 checks cover reminders and discreet notifications, logging a dose from a notification (and the duplicate-dose guard), the back button, backup and restore, receipt and meal recognition, the model list and fallback, supplement scanning and its safety rules, the meal-to-supplement prompt, the app lock with a PIN and with fingerprint, the settings pages, the first-launch restore (Drive, a file, or starting fresh) and the lock offer, the English, Russian, Spanish and French interfaces (no Hebrew left on any screen, the phone's language on a new install, switching back and forth, the guide and the PDF report), training and steps, Drive backup and retention, and layout at 360 px. **The APK is built only if every check passes**, so an update that breaks something never reaches the phone.
 
 To run them on your computer: `python3 -m pip install playwright && python3 -m playwright install chromium && python3 tests/run_tests.py`
 

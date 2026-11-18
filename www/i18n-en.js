@@ -1679,5 +1679,6 @@ window.MYSHOT_EN = {
 "חשוב לספר על זה לרופא. אם עולות מחשבות על פגיעה עצמית — ער״ן זמינים לשיחה בטלפון 1201, ובחירום מד״א 101.": "It's important to tell your doctor. If thoughts of self-harm come up, talk to your local crisis line (in Israel: ERAN, phone 1201), and in an emergency call your local emergency number (in Israel: MDA 101).",
 "כאב בטן חזק שלא עובר, במיוחד אם הוא מקרין לגב או מלווה בהקאות, דורש בדיקה דחופה. לא נוטלים את המנה הבאה ופונים לרופא או למיון.": "Severe stomach pain that doesn't go away, especially if it spreads to the back or comes with vomiting, needs urgent attention. Don't take the next dose, and see a doctor or go to the emergency room.",
 "המדריך הרפואי, כללי התרופות, הטיפים לתוספים ודוח ה-PDF באנגלית": "The medical guide, medication rules, supplement tips and the PDF report in English",
-"ממשק באנגלית: בחירת שפה בהגדרות ובמסך הפתיחה, והתאמה אוטומטית לשפת הטלפון בהתקנה חדשה": "English interface: choose the language in Settings and on the welcome screen, and a new install follows the phone's language"
+"ממשק באנגלית: בחירת שפה בהגדרות ובמסך הפתיחה, והתאמה אוטומטית לשפת הטלפון בהתקנה חדשה": "English interface: choose the language in Settings and on the welcome screen, and a new install follows the phone's language",
+"רוסית, ספרדית וצרפתית בממשק, והתוכן הרפואי באנגלית": "Russian, Spanish and French interface, with the medical content in English"
 };
