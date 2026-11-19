@@ -694,7 +694,9 @@ async def english_interface_end_to_end(b):
         found["setup"] = await hebrew_on_screen(page)
         await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
         found["lock offer"] = await hebrew_on_screen(page)
-        await page.click('[data-act="offer-skip"]'); await tick(page, 3)
+        await page.click('[data-act="offer-skip"]'); await tick(page, 4)
+        if await page.locator('#paywall.open').count():
+            found['plus offer'] = await hebrew_on_screen(page); await page.click('#paywall [data-act="pw-close"]'); await tick(page, 2)
         for tab in ["home", "shots", "food", "track", "more"]:
             await page.click(f'.tab[data-tab="{tab}"]'); await tick(page, 2); found[tab] = await hebrew_on_screen(page)
         await page.click('.tab[data-tab="food"]'); await tick(page, 1); await page.click('[data-act="seg"][data-k="supps"]'); await tick(page, 2); found["supplements"] = await hebrew_on_screen(page)
@@ -795,6 +797,9 @@ async def english_guide_about_and_report(b):
         await page.click('[data-act="welcome-new"]'); await tick(page, 3)
         await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.fill('#f-last', '2026-11-12T09:00'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
         if await page.locator('[data-act="offer-skip"]').count(): await page.click('[data-act="offer-skip"]'); await tick(page, 2)
+        await tick(page, 3)
+        if await page.locator('#paywall.open').count():
+            po = await hebrew_on_screen(page); check(not po, f"Hebrew on the English Plus offer: {po}"); await page.click('#paywall [data-act="pw-close"]'); await tick(page, 2)
         found = {}
         await page.click('.tab[data-tab="more"]'); await tick(page, 2)
         await page.click('.row[data-act="more-go"][data-k="guide"]'); await tick(page, 2)
@@ -832,6 +837,9 @@ async def lang_end_to_end(b, lang, home, settings):
         await page.click('[data-act="welcome-new"]'); await tick(page, 3)
         await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
         if await page.locator('[data-act="offer-skip"]').count(): await page.click('[data-act="offer-skip"]'); await tick(page, 2)
+        await tick(page, 3)
+        if await page.locator('#paywall.open').count():
+            found['plus offer'] = await hebrew_on_screen(page); await page.click('#paywall [data-act="pw-close"]'); await tick(page, 2)
         for tab in ["home", "shots", "food", "track", "more"]:
             await page.click(f'.tab[data-tab="{tab}"]'); await tick(page, 2); found[tab] = await hebrew_on_screen(page)
         await page.click('.tab[data-tab="food"]'); await tick(page, 1); await page.click('[data-act="seg"][data-k="supps"]'); await tick(page, 2); found["supplements"] = await hebrew_on_screen(page)
@@ -897,14 +905,14 @@ async def languages_follow_the_phone(b):
 
 PURCHASES = """window.MYSHOT_RC_KEY = 'goog_test_key';
 window.__rc = { active: false, calls: [] };
-const __ci = () => ({ entitlements: { all: {}, active: __rc.active ? { plus: { identifier: 'plus', isActive: true, willRenew: true, expirationDate: '2027-11-13T10:00:00Z' } } : {} }, managementURL: 'https://play.google.com/store/account/subscriptions' });
+const __ci = () => ({ entitlements: { all: {}, active: __rc.active ? { plus: { identifier: 'plus', isActive: true, willRenew: true, periodType: 'TRIAL', expirationDate: '2026-11-20T10:30:00Z' } } : {} }, managementURL: 'https://play.google.com/store/account/subscriptions' });
 window.Capacitor.Plugins.Purchases = {
   configure: async o => { __rc.calls.push('configure:' + o.apiKey); },
   getAppUserID: async () => ({ appUserID: '$RCAnonymousID:test123' }),
   getCustomerInfo: async () => ({ customerInfo: __ci() }),
   getOfferings: async () => ({ current: { identifier: 'default', availablePackages: [
-    { identifier: '$rc_monthly', packageType: 'MONTHLY', product: { identifier: 'myshot_plus:monthly', priceString: '₪14.90' } },
-    { identifier: '$rc_annual', packageType: 'ANNUAL', product: { identifier: 'myshot_plus:yearly', priceString: '₪99.00', defaultOption: { freePhase: { billingPeriod: { iso8601: 'P1W' } } } } }] } }),
+    { identifier: '$rc_monthly', packageType: 'MONTHLY', product: { identifier: 'myshot_plus:monthly', price: 14.9, currencyCode: 'ILS', priceString: '₪14.90' } },
+    { identifier: '$rc_annual', packageType: 'ANNUAL', product: { identifier: 'myshot_plus:yearly', price: 99, currencyCode: 'ILS', priceString: '₪99.00', defaultOption: { freePhase: { billingPeriod: { iso8601: 'P1W' } } } } }] } }),
   purchasePackage: async o => { __rc.calls.push('buy:' + o.aPackage.identifier); __rc.active = true; return { customerInfo: __ci(), productIdentifier: o.aPackage.product.identifier }; },
   restorePurchases: async () => { __rc.calls.push('restore'); return { customerInfo: __ci() }; } };"""
 THREE_REMINDERS = """if (!localStorage.getItem('__rem3')) { const db = JSON.parse(localStorage.getItem('__mockdb') || '{}'), k = 'data/users/u123/core'; let c = db[k]; const str = typeof c === 'string'; c = str ? JSON.parse(c) : c; c.settings = c.settings || {};
@@ -919,17 +927,34 @@ async def open_doctor_report(page):
     await page.click('#app [data-act="report"]'); await settle(page, 0.6, 8)
 
 
+async def paywall(page):
+    return (await page.locator('#paywall.open').count()) == 1
+
+
 @test
-async def plus_dev_build_keeps_everything_open(b):
+async def plus_preview_in_a_development_build(b):
     ctx, page, errs = await open_app(b)
     try:
         await open_doctor_report(page)
-        check("MyShot Plus" not in await page.inner_text("#sheet .sheet-title"), "a build without billing asked to pay for the report")
+        check(not await paywall(page) and "MyShot Plus" not in await page.inner_text("#sheet .sheet-title"), "a development build locked the report by default")
         await page.keyboard.press("Escape"); await tick(page, 2)
-        await page.click('.tab[data-tab="track"]'); await tick(page, 1); await page.click('[data-act="seg"][data-k="symptoms"]'); await tick(page, 2)
-        check(await page.locator('#app .plus-lock').count() == 0, "insights are locked in a build without billing")
         await page.click('[data-act="settings"]'); await tick(page, 2)
-        check(await page.locator('#sheet [data-act="plus-open"]').count() == 0, "a build without billing shows the Plus row")
+        check(await page.locator('#sheet .plus-card').count() == 1, "no Plus card at the top of settings")
+        await page.click('#sheet .plus-card'); await tick(page, 3)
+        t = await page.inner_text("#paywall")
+        check(await paywall(page) and "תצוגה מקדימה" in t, "the Plus screen did not open as a full-screen preview")
+        check(await page.locator('#paywall .pw-plan').count() == 2 and "שנתי" in await page.inner_text('#paywall .pw-plan.on'), "expected two plans with the yearly one selected")
+        check("איך עובד הניסיון החינמי" in t and "חיסכון" in t and "בחינם, תמיד" in t, "no trial timeline, savings badge or free-stays-free line")
+        await page.click('#paywall [data-act="plus-sim"][data-v="free"]'); await tick(page, 2)
+        await page.click('#paywall [data-act="pw-close"]'); await tick(page, 2)
+        await open_doctor_report(page); await tick(page, 3)
+        check(await paywall(page) and "דוח ה-PDF" in await page.inner_text("#paywall"), "as a free user the report did not open Plus with its reason")
+        await page.click('#paywall [data-act="pw-buy"]'); await tick(page, 2)
+        await page.click('.confirm [data-c="1"]'); await settle(page, 0.4, 4)
+        check("ברוכים הבאים ל-MyShot Plus" in await page.inner_text("#paywall"), "no welcome screen after the simulated purchase")
+        await page.click('#paywall .pw-foot [data-act="pw-close"]'); await tick(page, 2)
+        await open_doctor_report(page)
+        check(not await paywall(page), "the report is still locked as a subscriber")
         check(not errs, f"JS errors: {errs}")
     finally:
         await ctx.close()
@@ -944,20 +969,27 @@ async def plus_paywall_purchase_unlocks(b):
         await page.click('.tab[data-tab="track"]'); await tick(page, 1); await page.click('[data-act="seg"][data-k="symptoms"]'); await tick(page, 2)
         check(await page.locator('#app .plus-lock').count() >= 1, "insights are open without Plus")
         await open_doctor_report(page); await tick(page, 3)
-        check("MyShot Plus" in await page.inner_text("#sheet .sheet-title"), "the PDF report did not ask for Plus")
-        plans = await page.evaluate("Array.from(document.querySelectorAll('#f-plans .plan')).map(b => b.textContent.replace(/\\s+/g, ' ').trim())")
-        check(len(plans) == 2 and "₪99.00" in plans[0] and "₪14.90" in plans[1], f"plans from Play not shown (annual first): {plans}")
-        check("ניסיון" in plans[0], "the annual plan does not mention its free trial")
-        await page.click('#f-plans .plan.best'); await settle(page, 0.5, 6)
-        check("buy:$rc_annual" in await page.evaluate("__rc.calls"), "the annual package was not bought")
-        check("MyShot Plus" in await page.inner_text("#toast"), "no confirmation after buying")
+        t = await page.inner_text("#paywall")
+        check(await paywall(page) and "תצוגה מקדימה" not in t, "the PDF report did not open the real Plus screen")
+        on = await page.inner_text('#paywall .pw-plan.on')
+        check("₪99.00" in on and "45%" in on and "8.25" in on, f"the yearly plan should be selected, with its saving and monthly price: {on}")
+        check("להתחיל ניסיון חינם" in await page.inner_text('#paywall [data-act="pw-buy"]') and "7 ימים חינם, ואחר כך ₪99.00 לשנה" in await page.inner_text('#paywall .pw-terms'), "the button and the charge line do not match the trial")
+        await page.click('#paywall .pw-plan:not(.on)'); await tick(page, 2)
+        check("להצטרף" in await page.inner_text('#paywall [data-act="pw-buy"]') and await page.locator('#paywall .pw-tl').count() == 0 and "₪14.90 לחודש" in await page.inner_text('#paywall .pw-terms'), "choosing the monthly plan did not update the button and terms")
+        await page.click('#paywall .pw-plan:not(.on)'); await tick(page, 2)
+        await page.click('#paywall [data-act="pw-buy"]'); await settle(page, 0.5, 6)
+        check("buy:$rc_annual" in await page.evaluate("__rc.calls"), "the yearly package was not bought")
+        check("ברוכים הבאים ל-MyShot Plus" in await page.inner_text("#paywall"), "no welcome screen after buying")
+        await page.click('#paywall .pw-foot [data-act="pw-close"]'); await tick(page, 2)
         await open_doctor_report(page)
-        check("MyShot Plus" not in await page.inner_text("#sheet .sheet-title"), "the report is still locked after buying")
+        check(not await paywall(page), "the report is still locked after buying")
         await page.keyboard.press("Escape"); await tick(page, 2)
         await page.click('.tab[data-tab="track"]'); await tick(page, 1); await page.click('[data-act="seg"][data-k="symptoms"]'); await tick(page, 2)
         check(await page.locator('#app .plus-lock').count() == 0, "insights are still locked after buying")
         await page.click('[data-act="settings"]'); await tick(page, 2)
-        check("פעיל" in await page.inner_text('#sheet [data-act="plus-open"]'), "settings do not show Plus as active")
+        check("פעיל" in await page.inner_text('#sheet .plus-card'), "settings do not show Plus as active")
+        notes = await page.evaluate("__ln.scheduled.map(n => n.id + ' ' + n.title)")
+        check(any(n.startswith("6600 ") for n in notes), f"no reminder before the free trial ends: {notes[:4]}")
         check(not errs, f"JS errors: {errs}")
     finally:
         await ctx.close()
@@ -970,13 +1002,13 @@ async def plus_restore_and_reminder_limit(b):
         await tick(page, 4)
         await open_reminders(page)
         await page.click('[data-act="rem-cnew"]'); await tick(page, 3)
-        check("MyShot Plus" in await page.inner_text("#sheet .sheet-title"), "a 4th reminder of your own did not ask for Plus")
-        check("3" in await page.inner_text("#sheet .sheet-body"), "the paywall does not explain the 3-reminder limit")
+        check(await paywall(page) and "3 תזכורות" in await page.inner_text("#paywall"), "a 4th reminder of your own did not open Plus with the limit explained")
         await page.evaluate("__rc.active = true")
-        await page.click('[data-act="plus-restore"]'); await settle(page, 0.5, 6)
+        await page.click('#paywall [data-act="plus-restore"]'); await settle(page, 0.5, 6)
         check("restore" in await page.evaluate("__rc.calls") and "שוחזר" in await page.inner_text("#toast"), "restoring the purchase did not work")
+        await page.click('#paywall [data-act="pw-close"]'); await tick(page, 2)
         await page.click('[data-act="rem-cnew"]'); await tick(page, 3)
-        check("MyShot Plus" not in await page.inner_text("#sheet .sheet-title"), "a 4th reminder is still locked after restoring Plus")
+        check(not await paywall(page) and "MyShot Plus" not in await page.inner_text("#sheet .sheet-title"), "a 4th reminder is still locked after restoring Plus")
         check(not errs, f"JS errors: {errs}")
     finally:
         await ctx.close()
@@ -1000,8 +1032,8 @@ async def plus_ai_included_and_free_quota(b):
         check("אורז לבן" in await page.inner_text("#sheet .sheet-body"), "a meal photo did not work through MyShot AI without a key")
         check(seen["users"][:1] == ["$RCAnonymousID:test123"], f"MyShot AI did not get the anonymous user id: {seen['users']}")
         await page.click('[data-act="meal-rephoto"]'); await settle(page, 0.5, 10); await tick(page, 6)
-        check("MyShot Plus" in await page.inner_text("#sheet .sheet-title"), "using up the free quota did not offer Plus")
-        await page.keyboard.press("Escape"); await tick(page, 2)
+        check(await paywall(page) and "נגמרו הזיהויים" in await page.inner_text("#paywall"), "using up the free quota did not offer Plus")
+        await page.click('#paywall [data-act="pw-close"]'); await tick(page, 2)
         await settings_page(page, "ai")
         check("MyShot AI" in await page.inner_text("#sheet .sheet-body"), "the AI page does not explain MyShot AI")
         errs = [e for e in errs if "status of 402" not in e]   # the server's "quota used" answer, expected here
@@ -1016,9 +1048,29 @@ async def plus_paywall_in_english(b):
     try:
         await tick(page, 4)
         await open_doctor_report(page); await tick(page, 3)
-        body = await page.inner_text("#sheet")
+        body = await page.inner_text("#paywall")
         heb = [l for l in body.split("\n") if __import__('re').search('[\u0590-\u05FF]', l)]
-        check("Yearly" in body and "Restore purchase" in body and not heb, f"the paywall is not fully in English: {heb[:3]}")
+        check("Yearly" in body and "Start free trial" in body and "Restore purchase" in body and not heb, f"the paywall is not fully in English: {heb[:3]}")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def plus_offered_after_first_setup_and_on_home(b):
+    ctx, page, errs = await open_app(b, BIO, pre=FRESH)
+    try:
+        await tick(page, 3)
+        await page.click('[data-act="welcome-new"]'); await tick(page, 3)
+        await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
+        await page.click('[data-act="offer-skip"]'); await tick(page, 4)
+        check(await paywall(page), "Plus was not offered after the first setup")
+        await page.click('#paywall [data-act="pw-close"]'); await tick(page, 2)
+        check(not await paywall(page) and await page.evaluate("localStorage.getItem('mj-plus-intro')") == "1", "closing the offer did not work or it will show again")
+        await page.evaluate("localStorage.setItem('mj-opens', '5')"); await page.click('.tab[data-tab="shots"]'); await tick(page, 1); await page.click('.tab[data-tab="home"]'); await tick(page, 2)
+        check(await page.locator('#app .plus-home').count() == 1, "no Plus card on the home screen")
+        await page.click('#app .plus-home [data-act="plus-card-hide"]'); await tick(page, 2)
+        check(await page.locator('#app .plus-home').count() == 0, "the home Plus card did not hide")
         check(not errs, f"JS errors: {errs}")
     finally:
         await ctx.close()

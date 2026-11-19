@@ -526,6 +526,22 @@ html.is-locked body>*:not(#lock){visibility:hidden}
 .welcome-opts{display:flex;flex-direction:column;gap:10px}.wopt{display:flex;align-items:center;gap:14px;width:100%;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;font:inherit;color:var(--ink);cursor:pointer;min-height:68px;box-sizing:border-box}.wopt:active{background:var(--surface-2)}.wopt-ico{display:inline-flex;width:42px;height:42px;border-radius:12px;background:var(--surface-2);align-items:center;justify-content:center;flex:none}.wopt-ico svg{width:24px;height:24px}.wopt-txt{display:flex;flex-direction:column;gap:2px;min-width:0}.wopt .row-title{font-weight:600}.wopt input[type=file]{display:none}
 [dir=ltr] input[type=date],[dir=ltr] input[type=datetime-local],[dir=ltr] input[type=time],[dir=ltr] input[type=number]{text-align:left}[dir=ltr] .lightbox .icon-btn{left:auto;right:10px}[dir=ltr] .hn{direction:ltr;text-align:left}
 .plus-hero{text-align:center;margin:2px 0 10px}.plus-hero svg{width:56px;height:56px}.plus-hero h2{font-family:var(--font-display);margin:8px 0 4px;color:var(--ink)}.plus-list{list-style:none;padding:0;margin:0 0 14px}.plus-list li{padding:6px 0;padding-inline-start:28px;position:relative;color:var(--ink)}.plus-list li::before{content:'✓';position:absolute;inset-inline-start:4px;color:var(--ok);font-weight:700}#f-plans{display:flex;flex-direction:column;gap:10px}.plan{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;width:100%;padding:14px 16px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;text-align:start;box-sizing:border-box}.plan.best{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}.plan-name{font-weight:700}.plan-price{font-weight:700;font-size:18px}.plan-note{flex-basis:100%;font-size:13px;color:var(--ok)}.plus-lock{border:1.5px dashed var(--line);border-radius:16px;padding:16px;margin:14px 0}
+#paywall{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;background:var(--paper);color:var(--ink)}#paywall.open{display:flex}html.pw-open,html.pw-open body{overflow:hidden}
+.pw-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 4px}.pw-link{background:none;border:0;color:var(--ink-2);font:inherit;font-size:14px;text-decoration:underline;cursor:pointer;padding:8px}.pw-preview{font-size:12px;font-weight:700;color:var(--hl-ink);background:var(--hl);border-radius:999px;padding:3px 10px}
+.pw-scroll{flex:1;overflow-y:auto;padding:0 20px 20px;-webkit-overflow-scrolling:touch}.pw-hero{text-align:center;margin:4px 0 14px}.pw-hero svg{width:64px;height:64px}.pw-hero h1{font-family:var(--font-display);font-size:30px;margin:8px 0 6px}.pw-hero h1 span{background:var(--hl);color:var(--hl-ink);border-radius:10px;padding:0 8px}.pw-hero p{margin:0 auto;max-width:330px;color:var(--ink-2)}
+.pw-list{list-style:none;margin:0 0 10px;padding:0}.pw-list li{display:flex;gap:12px;align-items:center;padding:8px 0}.pw-ico{width:34px;height:34px;flex:none;border-radius:10px;background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center}.pw-ico svg{width:20px;height:20px}
+.pw-free{font-size:13px;color:var(--ok);text-align:center;margin:4px 0 16px}.pw-plans{display:flex;flex-direction:column;gap:12px}
+.pw-plan{position:relative;display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:16px;border-radius:18px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;text-align:start;cursor:pointer}.pw-plan.on{border-color:var(--ink);box-shadow:0 6px 18px rgba(24,34,79,.12)}
+.pw-badge{position:absolute;top:-11px;inset-inline-start:16px;background:var(--hl);color:var(--hl-ink);font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px}
+.pw-radio{width:22px;height:22px;flex:none;border-radius:50%;border:2px solid var(--line)}.pw-plan.on .pw-radio{border:7px solid var(--ink)}.pw-plan-main{flex:1;display:flex;flex-direction:column;gap:2px}.pw-plan-name{font-weight:700;font-size:17px}.pw-plan-trial{font-size:13px;color:var(--ok)}
+.pw-plan-price{display:flex;flex-direction:column;align-items:flex-end;font-weight:700;font-size:18px}.pw-plan-price small{font-weight:500;font-size:12px;color:var(--ink-2)}.pw-pm{color:var(--ok)!important}
+.pw-tl{margin:18px 0 6px;padding:14px 16px;border-radius:16px;background:var(--surface-2)}.pw-tl h3{margin:0 0 8px;font-size:15px}.pw-tl ol{list-style:none;margin:0;padding:0}.pw-tl li{display:flex;gap:10px;padding:6px 0}.pw-tl li b{min-width:64px}
+.pw-dev{margin-top:18px;padding:14px;border-radius:16px;border:1.5px dashed var(--line)}
+.pw-foot{padding:12px 20px calc(env(safe-area-inset-bottom,0px) + 12px);border-top:1px solid var(--line);background:var(--paper)}.pw-cta{width:100%;min-height:54px;font-size:17px;border-radius:16px}.pw-terms{margin:8px 0 0;font-size:12px;color:var(--ink-2);text-align:center}
+.plus-card{display:flex;align-items:center;gap:14px;width:100%;box-sizing:border-box;margin:0 0 14px;padding:16px;border:0;border-radius:18px;background:linear-gradient(135deg,#18224F,#2E3C7E);color:#fff;font:inherit;text-align:start;cursor:pointer}.plus-card svg{color:#fff}.plus-card.on{background:linear-gradient(135deg,#1f6b4f,#2f8f6a)}.plus-card-star{width:40px;height:40px;flex:none;border-radius:12px;background:#F7D64A;color:#18224F;display:inline-flex;align-items:center;justify-content:center;font-size:20px}.plus-card-txt{flex:1;display:flex;flex-direction:column;gap:2px}.plus-card-txt span{font-size:13px;opacity:.85}
+.plus-badge{display:inline-block;margin-inline-start:6px;padding:1px 7px;border-radius:999px;background:#F7D64A;color:#18224F;font-size:11px;font-weight:700;vertical-align:middle}
+.plus-home{display:flex;align-items:center;gap:6px;margin:14px 0;padding:6px 6px 6px 0;border-radius:18px;background:var(--surface);border:1.5px solid var(--line)}.plus-home-main{flex:1;display:flex;align-items:center;gap:12px;background:none;border:0;color:var(--ink);font:inherit;text-align:start;padding:10px 12px;cursor:pointer}.plus-home-main span span{display:block;font-size:13px;color:var(--ink-2)}.plus-home-star{width:34px;height:34px;flex:none;border-radius:10px;background:#F7D64A;color:#18224F;display:inline-flex;align-items:center;justify-content:center}
+#toast{z-index:9000}
 </style>
 </head>
 <body>
@@ -809,8 +825,9 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 const CHANGELOG = [
+  ['1.9.1', _tx('מסך Plus חדש במסך מלא, Plus גלוי בהגדרות, בבית ובתכונות, ותצוגה מקדימה בגרסת פיתוח')],
   ['1.9.0', _tx('MyShot Plus: מנוי עם AI כלול, גיבוי אוטומטי, דוח לרופא ותובנות')],
   ['1.8.0', _tx('רוסית, ספרדית וצרפתית בממשק, והתוכן הרפואי באנגלית')],
   ['1.7.1', _tx('המדריך הרפואי, כללי התרופות, הטיפים לתוספים ודוח ה-PDF באנגלית')],
@@ -1048,6 +1065,8 @@ const Reminders = {
       let d = nextOccurrence(startOfDay(now), r.backupDay, r.backupTime); if (d <= now) d = addDays(d, 7);
       for (let k = 0; k < 4; k++) add(6500 + k, addDays(d, 7 * k), _tx('זמן לגיבוי'), _tx('שמירת גיבוי של MyShot ב-Google Drive'), { kind: 'backup' }, 'general', 'BACKUP');
     }
+    const trialEnd = Plus.trialEnd();
+    if (trialEnd) { const w = new Date(trialEnd - 2 * DAY); w.setHours(10, 0, 0, 0); add(6600, w, _tx('הניסיון החינמי של MyShot Plus מסתיים בעוד יומיים'), _tx('אם לא תבטלו ב-Google Play, המנוי יתחיל ויחויב.'), { kind: 'plus' }, 'general', ''); }
     r.custom.forEach((c, ci) => {
       if (!c.on || ci >= 80) return;
       customOccurrences(c, now, at).slice(0, 10).forEach((w, k) => add(9000 + ci * 10 + k, w, c.title, c.note || _tx('תזכורת שלך'), { kind: 'custom', id: c.id }, 'general'));
@@ -1443,8 +1462,8 @@ async function welcomeRestore(id, name) {
 function afterFirstRestore() { if (!S.core.settings.setup) openOnboarding(); else offerLock(); }
 // Offered once, after the first restore or the first setup.
 function offerLock() {
-  if (!Native.on || Lock.on() || Sheet.isOpen()) return;
-  try { if (localStorage.getItem('mj-lock-offer')) return; localStorage.setItem('mj-lock-offer', '1'); } catch (e) {}
+  if (!Native.on || Lock.on() || Sheet.isOpen()) { maybePlusIntro(); return; }
+  try { if (localStorage.getItem('mj-lock-offer')) { maybePlusIntro(); return; } localStorage.setItem('mj-lock-offer', '1'); } catch (e) {}
   F = { kind: 'lockoffer' };
   Sheet.open(_tx('לנעול את MyShot?'), `<p class="lead" style="margin-top:4px">${_tx`יש כאן מידע רפואי אישי. אפשר לנעול את האפליקציה, כך שרק אתם תוכלו לפתוח אותה.`}</p>
     <div class="welcome-opts">${wopt('offer-bio', icoFinger(), _tx('טביעת אצבע'), _tx('ואם היא לא מזוהה, קוד הנעילה של הטלפון'), ' id="offer-bio"')}${wopt('offer-pin', icoLock(), _tx('קוד'), _tx('4 עד 6 ספרות שתבחרו'))}</div>
@@ -1462,8 +1481,21 @@ const Plus = {
   key() { return window.MYSHOT_RC_KEY || ''; },
   p() { return Native.plugin('Purchases'); },
   billing() { return Native.on && !!this.key(); },
-  st() { try { return JSON.parse(localStorage.getItem('mj-plus') || '{}') || {}; } catch (e) { return {}; } },
-  active() { return !this.billing() || !!this.st().active; },
+  shown() { return Native.on; },                                  // Plus is visible in every app build; buying needs the Play build
+  sim() { try { return localStorage.getItem('mj-plus-sim') || 'open'; } catch (e) { return 'open'; } },
+  setSim(v, trialDays) { try { localStorage.setItem('mj-plus-sim', v); if (v === 'plus' && trialDays) localStorage.setItem('mj-plus-sim-until', new Date(Date.now() + trialDays * DAY).toISOString()); else localStorage.removeItem('mj-plus-sim-until'); } catch (e) {} if (Native.on) Reminders.soon(300); },
+  st() {
+    if (!this.billing()) { const u = localStorage.getItem('mj-plus-sim-until'); return { active: this.sim() === 'plus', until: u, renew: true, trial: !!u, preview: true }; }
+    try { return JSON.parse(localStorage.getItem('mj-plus') || '{}') || {}; } catch (e) { return {}; }
+  },
+  active() { return this.billing() ? !!this.st().active : this.sim() !== 'free'; },   // may use Plus features
+  isSub() { return !!this.st().active; },                                              // is (or acts as) a subscriber
+  trialEnd() { const st = this.st(); return st.active && st.trial && st.until ? Date.parse(st.until) : null; },
+  previewPkgs() {
+    const P = window.MYSHOT_PLUS_PREVIEW || { monthly: 14.9, yearly: 99, currency: 'ILS', trialDays: 7 };
+    return [{ identifier: '$rc_monthly', packageType: 'MONTHLY', product: { identifier: 'preview:monthly', price: P.monthly, currencyCode: P.currency, priceString: fmtMoney(P.monthly, P.currency) } },
+            { identifier: '$rc_annual', packageType: 'ANNUAL', product: { identifier: 'preview:yearly', price: P.yearly, currencyCode: P.currency, priceString: fmtMoney(P.yearly, P.currency), trialDays: P.trialDays } }];
+  },
   async init() {
     if (!this.billing()) return;
     const P = this.p(); if (!P) return;
@@ -1474,9 +1506,10 @@ const Plus = {
   },
   apply(ci) {
     const ent = ci && ci.entitlements && ci.entitlements.active ? ci.entitlements.active[PLUS_ENT] : null;
-    const st = { active: !!ent, until: (ent && ent.expirationDate) || null, renew: !!(ent && ent.willRenew), manage: (ci && ci.managementURL) || null, at: Date.now() };
-    const was = !!this.st().active;
+    const st = { active: !!ent, until: (ent && ent.expirationDate) || null, renew: !!(ent && ent.willRenew), trial: !!(ent && ent.periodType === 'TRIAL'), manage: (ci && ci.managementURL) || null, at: Date.now() };
+    const old = this.st(), was = !!old.active;
     try { localStorage.setItem('mj-plus', JSON.stringify(st)); } catch (e) {}
+    if ((old.until !== st.until || old.trial !== st.trial || was !== st.active) && Native.on) Reminders.soon(300);
     if (was !== st.active && App.ready && !Sheet.isOpen()) App.render();
     return st;
   },
@@ -1500,29 +1533,91 @@ const MyShotAI = {
 const PLUS_WHY = () => ({ ai: _tx('נגמרו הזיהויים החינמיים של החודש.'), report: _tx('דוח ה-PDF לרופא עם גרפים הוא חלק מ-MyShot Plus.'), compare: _tx('השוואת תמונות ושכבה שקופה הן חלק מ-MyShot Plus.'), receipts: _tx('מעקב קבלות והחזרים מהביטוח הוא חלק מ-MyShot Plus.'), insights: _tx('התובנות על תופעות הלוואי הן חלק מ-MyShot Plus.'), drive: _tx('הגיבוי האוטומטי ל-Drive הוא חלק מ-MyShot Plus.'), reminders: _tx('בחינם אפשר עד 3 תזכורות משלך. ב-MyShot Plus אין הגבלה.') });
 const PLUS_LIST = () => [_tx('AI כלול, בלי מפתח: צילום ארוחות, תוויות, תוספים וקבלות'), _tx('גיבוי אוטומטי יומי ל-Google Drive'), _tx('דוח PDF לרופא עם גרפים'), _tx('תובנות על תופעות הלוואי לאורך זמן'), _tx('השוואת תמונות התקדמות'), _tx('קבלות והחזרים מהביטוח'), _tx('תזכורות משלך בלי הגבלה')];
 const plusListHTML = () => `<ul class="plus-list">${PLUS_LIST().map(t => `<li>${esc(t)}</li>`).join('')}</ul>`;
-async function openPaywall(feature) {
-  if (!Plus.billing()) return;
-  F = { kind: 'paywall', feature, pkgs: [] };
-  const st = Plus.st(), why = PLUS_WHY()[feature];
-  if (st.active) {
-    Sheet.open('MyShot Plus', `<div class="plus-hero">${LOGO_MARK}<h2>${_tx('MyShot Plus פעיל')}</h2>${st.until ? `<p class="muted">${st.renew ? `${_tx`מתחדש ב-${fmtD(new Date(st.until))}`}` : `${_tx`בתוקף עד ${fmtD(new Date(st.until))}`}`}</p>` : ''}</div>${plusListHTML()}`, `<button class="btn secondary" data-act="plus-manage">${_tx('ניהול המנוי ב-Google Play')}</button>`);
-    return;
-  }
-  Sheet.open('MyShot Plus', `<div class="plus-hero">${LOGO_MARK}<h2>MyShot Plus</h2>${why ? `<p class="muted">${esc(why)}</p>` : ''}</div>${plusListHTML()}
-    <div id="f-plans"><div class="scan-wait"><div class="spin" aria-hidden="true"></div></div></div>
-    <p class="tiny muted" style="margin-top:12px">${_tx('המנוי מתחדש אוטומטית עד שמבטלים. אפשר לבטל בכל רגע ב-Google Play, והגישה נשארת עד סוף התקופה ששולמה. הנתונים שלך נשארים שלך גם בלי מנוי.')}</p>`,
-    `<button class="btn quiet" data-act="plus-restore">${_tx('שחזור רכישה')}</button>`);
-  const off = await Plus.offering();
-  if (F.kind !== 'paywall') return;
-  const box = $('#f-plans'); if (!box) return;
-  const pkgs = (off && off.availablePackages) || []; F.pkgs = pkgs;
-  if (!pkgs.length) { box.innerHTML = `<div class="note warn">${_tx('לא הצלחנו לטעון את המחירים. בדקו את החיבור ונסו שוב.')}</div>`; return; }
-  const label = pk => pk.packageType === 'ANNUAL' ? _tx('שנתי') : pk.packageType === 'MONTHLY' ? _tx('חודשי') : ((pk.product && pk.product.title) || pk.identifier);
-  const trial = pk => { const pr = pk.product || {}; return !!(pr.introPrice || (pr.defaultOption && pr.defaultOption.freePhase)); };
-  box.innerHTML = pkgs.slice().sort((a, b) => (b.packageType === 'ANNUAL') - (a.packageType === 'ANNUAL')).map(pk => `<button class="plan${pk.packageType === 'ANNUAL' ? ' best' : ''}" data-act="plus-buy" data-i="${pkgs.indexOf(pk)}"><span class="plan-name">${esc(label(pk))}</span><span class="plan-price">${esc((pk.product && pk.product.priceString) || '')}</span>${trial(pk) ? `<span class="plan-note">${_tx('כולל תקופת ניסיון חינם')}</span>` : ''}</button>`).join('');
+const fmtMoney = (v, cur) => { try { return new Intl.NumberFormat(LANG === 'he' ? 'he-IL' : LANG, { style: 'currency', currency: cur || 'ILS', maximumFractionDigits: 2 }).format(v); } catch (e) { return (Math.round(v * 100) / 100).toFixed(2); } };
+const PLUS_FEATURES = () => [[ICON.spark, _tx('AI כלול, בלי מפתח: צילום ארוחות, תוויות, תוספים וקבלות')], [ICON.clip, _tx('גיבוי אוטומטי יומי ל-Google Drive')], [ICON.book, _tx('דוח PDF לרופא עם גרפים')], [ICON.pulse, _tx('תובנות על תופעות הלוואי לאורך זמן')], [ICON.photoSmall, _tx('השוואת תמונות התקדמות')], [ICON.rcpt, _tx('קבלות והחזרים מהביטוח')], [ICON.gear, _tx('תזכורות משלך בלי הגבלה')]];
+const pkgTrialDays = pk => { const pr = (pk && pk.product) || {}; if (pr.trialDays) return pr.trialDays; const iso = (pr.defaultOption && pr.defaultOption.freePhase && pr.defaultOption.freePhase.billingPeriod && pr.defaultOption.freePhase.billingPeriod.iso8601) || (pr.introPrice && pr.introPrice.price === 0 && pr.introPrice.period) || ''; const m = String(iso).match(/P(\d+)([DWMY])/); return m ? +m[1] * ({ D: 1, W: 7, M: 30, Y: 365 })[m[2]] : 0; };
+const pkgIsYear = pk => pk && pk.packageType === 'ANNUAL';
+const pkgPrice = pk => (pk && pk.product && pk.product.priceString) || '';
+let PW = { feature: '', pkgs: [], sel: -1 };
+const Paywall = {
+  el: null,
+  isOpen() { return !!(this.el && this.el.classList.contains('open')); },
+  mount() { if (!this.el) { const d = document.createElement('div'); d.id = 'paywall'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', 'MyShot Plus'); document.body.appendChild(d); this.el = d; } return this.el; },
+  show(html) { const d = this.mount(); const top = d.querySelector('.pw-scroll'), y = top ? top.scrollTop : 0; d.innerHTML = html; d.classList.add('open'); document.documentElement.classList.add('pw-open'); const n = d.querySelector('.pw-scroll'); if (n && PW.keepScroll) n.scrollTop = y; PW.keepScroll = false; },
+  close() { if (!this.el) return; this.el.classList.remove('open'); this.el.innerHTML = ''; document.documentElement.classList.remove('pw-open'); },
+};
+function annualSaving(pkgs) {
+  const y = pkgs.find(pkgIsYear), m = pkgs.find(x => x.packageType === 'MONTHLY');
+  const yp = y && y.product && y.product.price, mp = m && m.product && m.product.price;
+  return yp && mp ? Math.round((1 - yp / (12 * mp)) * 100) : 0;
+}
+function billingLine(pk) {
+  const d = pkgTrialDays(pk), price = pkgPrice(pk), per = pkgIsYear(pk) ? _tx('לשנה') : _tx('לחודש');
+  return d ? _tx`${d} ימים חינם, ואחר כך ${price} ${per}. אפשר לבטל בכל רגע ב-Google Play.` : _tx`${price} ${per}, מתחדש אוטומטית. אפשר לבטל בכל רגע ב-Google Play.`;
+}
+function paywallTopHTML() {
+  return `<div class="pw-top"><button class="icon-btn" data-act="pw-close" aria-label="${_tx('סגירה')}">${ICON.x}</button>${Plus.billing() ? '' : `<span class="pw-preview">${_tx('תצוגה מקדימה')}</span>`}<button class="pw-link" data-act="plus-restore">${_tx('שחזור רכישה')}</button></div>`;
+}
+const pwListHTML = () => `<ul class="pw-list">${PLUS_FEATURES().map(f => `<li><span class="pw-ico" aria-hidden="true">${f[0]}</span><span>${esc(f[1])}</span></li>`).join('')}</ul>`;
+function devSimHTML() {
+  if (Plus.billing()) return '';
+  return `<div class="pw-dev"><div class="row-title">${_tx('גרסת פיתוח')}</div><p class="tiny muted" style="margin:4px 0 8px">${_tx('בגרסה הזו אין רכישה אמיתית. אפשר לראות איך האפליקציה נראית לכל סוג משתמש:')}</p><div class="chips">${[['open', _tx('הכול פתוח')], ['free', _tx('כמשתמש חינמי')], ['plus', _tx('כמנוי')]].map(([v, l]) => `<button class="chip" data-act="plus-sim" data-v="${v}" aria-pressed="${Plus.sim() === v}">${l}</button>`).join('')}</div></div>`;
+}
+function paywallHTML(pkgs) {
+  const why = PLUS_WHY()[PW.feature], sel = pkgs && pkgs[PW.sel];
+  const saving = pkgs ? annualSaving(pkgs) : 0;
+  const plans = pkgs == null ? '<div class="scan-wait"><div class="spin" aria-hidden="true"></div></div>'
+    : !pkgs.length ? `<div class="note warn">${_tx('לא הצלחנו לטעון את המחירים. בדקו את החיבור ונסו שוב.')}</div>`
+    : pkgs.map((pk, i) => ({ pk, i })).sort((a, b) => pkgIsYear(b.pk) - pkgIsYear(a.pk)).map(({ pk, i }) => {
+        const yr = pkgIsYear(pk), pr = pk.product || {}, d = pkgTrialDays(pk), on = i === PW.sel;
+        const pm = yr && pr.price ? fmtMoney(pr.price / 12, pr.currencyCode) : '';
+        return `<button class="pw-plan${on ? ' on' : ''}" role="radio" aria-checked="${on}" data-act="pw-sel" data-i="${i}">${yr ? `<span class="pw-badge">${saving > 0 ? _tx`הכי משתלם · חיסכון ${saving}%` : _tx('הכי משתלם')}</span>` : ''}<span class="pw-radio" aria-hidden="true"></span><span class="pw-plan-main"><span class="pw-plan-name">${yr ? _tx('שנתי') : _tx('חודשי')}</span>${d ? `<span class="pw-plan-trial">${_tx`${d} ימי ניסיון חינם`}</span>` : ''}</span><span class="pw-plan-price">${esc(pr.priceString || '')}<small>${yr ? _tx('לשנה') : _tx('לחודש')}</small>${pm ? `<small class="pw-pm">${_tx`${pm} לחודש`}</small>` : ''}</span></button>`;
+      }).join('');
+  const d = sel ? pkgTrialDays(sel) : 0;
+  const timeline = d ? `<div class="pw-tl"><h3>${_tx('איך עובד הניסיון החינמי')}</h3><ol><li><b>${_tx('היום')}</b><span>${_tx('גישה מלאה לכל מה שב-Plus')}</span></li><li><b>${_tx`יום ${Math.max(1, d - 2)}`}</b><span>${_tx('נזכיר לך שהניסיון עומד להסתיים')}</span></li><li><b>${_tx`יום ${d}`}</b><span>${_tx('החיוב מתחיל, אלא אם ביטלת לפני כן ב-Google Play')}</span></li></ol></div>` : '';
+  return paywallTopHTML() + `<div class="pw-scroll">
+    <div class="pw-hero">${LOGO_MARK}<h1>MyShot <span>Plus</span></h1><p>${esc(why || _tx('פחות עבודה, יותר תמיכה: AI בלי מפתח, גיבוי אוטומטי ודוח לרופא.'))}</p></div>
+    ${pwListHTML()}
+    <p class="pw-free">${_tx('התזכורות, המעקב, המדריך והנתונים שלך נשארים בחינם, תמיד.')}</p>
+    <div class="pw-plans" role="radiogroup" aria-label="${_tx('בחירת מסלול')}">${plans}</div>
+    ${timeline}${devSimHTML()}
+  </div>
+  <div class="pw-foot">${sel ? `<button class="btn pw-cta" data-act="pw-buy">${d ? _tx('להתחיל ניסיון חינם') : _tx('להצטרף ל-MyShot Plus')}</button><p class="pw-terms">${esc(billingLine(sel))}</p>` : ''}</div>`;
+}
+function paywallActiveHTML() {
+  const st = Plus.st();
+  const when = st.until ? (st.trial ? `${_tx`תקופת הניסיון מסתיימת ב-${fmtD(new Date(st.until))}`}` : st.renew ? `${_tx`מתחדש ב-${fmtD(new Date(st.until))}`}` : `${_tx`בתוקף עד ${fmtD(new Date(st.until))}`}`) : '';
+  return paywallTopHTML() + `<div class="pw-scroll"><div class="pw-hero">${LOGO_MARK}<h1>MyShot <span>Plus</span></h1><p><b>${_tx('MyShot Plus פעיל')}</b>${when ? ` · ${esc(when)}` : ''}</p></div>${pwListHTML()}${devSimHTML()}</div>
+    <div class="pw-foot"><button class="btn secondary pw-cta" data-act="plus-manage">${_tx('ניהול המנוי ב-Google Play')}</button></div>`;
+}
+function plusWelcomeHTML() {
+  return `<div class="pw-top"><span></span><button class="icon-btn" data-act="pw-close" aria-label="${_tx('סגירה')}">${ICON.x}</button></div><div class="pw-scroll"><div class="pw-hero pw-done">${LOGO_MARK}<h1>${_tx('ברוכים הבאים ל-MyShot Plus')} 🎉</h1><p>${_tx('הכול פתוח. זה מה שקיבלת:')}</p></div>${pwListHTML()}</div><div class="pw-foot"><button class="btn pw-cta" data-act="pw-close">${_tx('בואו נתחיל')}</button></div>`;
+}
+async function openPaywall(feature, opts = {}) {
+  if (!Plus.shown()) return;
+  if (Sheet.isOpen()) Sheet.close();
+  PW = { feature: feature || '', pkgs: [], sel: -1, source: opts.source || '' };
+  if (Plus.isSub()) { Paywall.show(paywallActiveHTML()); return; }
+  Paywall.show(paywallHTML(null));
+  const pkgs = Plus.billing() ? ((((await Plus.offering()) || {}).availablePackages) || []) : Plus.previewPkgs();
+  if (!Paywall.isOpen() || PW.feature !== (feature || '')) return;
+  PW.pkgs = pkgs; PW.sel = pkgs.length ? Math.max(0, pkgs.findIndex(pkgIsYear)) : -1;
+  Paywall.show(paywallHTML(pkgs));
+}
+function maybePlusIntro() {
+  if (!Plus.shown() || Plus.isSub()) return;
+  try { if (localStorage.getItem('mj-plus-intro')) return; localStorage.setItem('mj-plus-intro', '1'); } catch (e) { return; }
+  setTimeout(() => { if (!Sheet.isOpen() && !Paywall.isOpen() && !Lock.on()) openPaywall('', { source: 'onboarding' }); }, 600);
+}
+const plusBadge = () => Plus.shown() && !Plus.isSub() ? '<span class="plus-badge">Plus</span>' : '';
+function homePlusCardHTML() {
+  if (!Plus.shown() || Plus.isSub()) return '';
+  let opens = 0, hid = 0; try { opens = +localStorage.getItem('mj-opens') || 0; hid = +localStorage.getItem('mj-plus-card-hide') || 0; } catch (e) {}
+  if (opens < 3 || Date.now() < hid) return '';
+  return `<div class="plus-home"><button class="plus-home-main" data-act="plus-open" data-f="home"><span class="plus-home-star" aria-hidden="true">★</span><span><b>MyShot Plus</b><span>${_tx('AI בלי מפתח, גיבוי אוטומטי ודוח לרופא. אפשר לנסות בחינם.')}</span></span></button><button class="icon-btn" data-act="plus-card-hide" aria-label="${_tx('לא עכשיו')}">${ICON.x}</button></div>`;
 }
 function plusLockedHTML(feature, title) {
-  return `<div class="plus-lock"><div class="row-title">${esc(title)}</div><p class="small muted" style="margin:4px 0 10px">${esc(PLUS_WHY()[feature] || '')}</p><button class="chip" data-act="plus-open" data-f="${feature}">MyShot Plus</button></div>`;
+  return `<div class="plus-lock"><div class="row-title">🔒 ${esc(title)} <span class="plus-badge">Plus</span></div><p class="small muted" style="margin:4px 0 10px">${esc(PLUS_WHY()[feature] || '')}</p><button class="chip" data-act="plus-open" data-f="${feature}">MyShot Plus</button></div>`;
 }
 function myshotAiNoteHTML() {
   if (!MyShotAI.on()) return '';
@@ -1952,6 +2047,7 @@ async function nativeBoot() {
   if (AP) {
     try {
       AP.addListener('backButton', () => {
+        if (Paywall.isOpen()) { Paywall.close(); return; }
         if (Sheet.isOpen()) { if (F && typeof F.back === 'function') { F.back(); return; } Sheet.close(); return; }
         if (App.tab === 'more' && App.more) { App.more = null; App.render(); window.scrollTo(0, 0); return; }
         if (App.tab !== 'home') { setTab('home', true); return; }
@@ -2677,8 +2773,9 @@ function viewHome() {
   const rs = receiptStats();
   h += `<h2 class="h-section">${_tx`הוצאות`}</h2><div class="group">
     <button class="row" data-act="tab" data-tab="receipts"><div class="grow"><div class="row-title">${_tx`החודש: ${money(rs.month)}`}</div><div class="row-sub">${_tx`מתחילת הרישום: ${money(rs.total)}${rs.refunds ? `${_tx`, החזרים: ${money(rs.refunds)}`}` : ''}`}</div></div>${rs.pending ? `<span class="badge todo">${_tx`${rs.pending} להגשה`}</span>` : ''}${ICON.chev}</button>
-    <button class="row add" data-act="add-receipt">${ICON.cam}<span class="grow">${_tx`צילום קבלה`}</span>${ICON.chev}</button>
+    <button class="row add" data-act="add-receipt">${ICON.cam}<span class="grow">${_tx`צילום קבלה`}${plusBadge()}</span>${ICON.chev}</button>
   </div>`;
+  h += homePlusCardHTML();
   return h;
 }
 
@@ -2871,7 +2968,7 @@ function periodHTML() {
   return `<h2 class="h-section">${_tx`תמונת מצב`}</h2><div class="chips" role="group" aria-label="${_tx`תקופה`}"><button class="chip" data-act="period" data-k="week" aria-pressed="${App.period === 'week'}">${_tx`7 הימים האחרונים`}</button><button class="chip" data-act="period" data-k="month" aria-pressed="${App.period === 'month'}">${_tx`30 הימים האחרונים`}</button></div>
   <div class="group mt"><div class="ptable"><div></div><div class="v">${_tx`התקופה`}</div><div class="v">${_tx`הקודמת`}</div>${rows.map(r => `<div>${r[0]}</div><div class="v">${r[1]}</div><div class="v">${r[2]}</div>`).join('')}</div></div>
   <p class="tiny muted mt">${_tx`הממוצעים מחושבים רק לפי ימים שבהם היה תיעוד.`}</p>
-  <button class="btn secondary block mt" data-act="report">${_tx`דוח PDF לרופא`}</button>`;
+  <button class="btn secondary block mt" data-act="report">${_tx`דוח PDF לרופא`}${plusBadge()}</button>`;
 }
 function streaksHTML() {
   const ms = milestones(), done = ms.filter(m => m.done).length;
@@ -2918,7 +3015,7 @@ function photosHTML() {
   let h = `<h2 class="h-section">${_tx`תמונות התקדמות`}</h2>`;
   if (items.length) h += `<div class="photos">${items.slice(0, 9).map(x => `<button class="ph" data-act="photo-view" data-id="${esc(x.id)}" aria-label="${_tx`תמונה מ-${fmtDY(parseDT(x.d))}, ${POSES[x.pose] || ''}`}"><img data-thumb="${esc(x.id)}" alt=""><span>${fmtD(parseDT(x.d))}, ${POSES[x.pose] || ''}</span></button>`).join('')}</div>`;
   else h += _tx('<p class="lead">צלמו תמונה מאותה זווית כל כמה שבועות. לפעמים השינוי ניכר בתמונות עוד לפני שהוא ניכר במשקל.</p>');
-  h += `<div class="btn-row mt"><button class="btn secondary" data-act="photo-add">${_tx`${ICON.cam} תמונה חדשה`}</button>${items.length >= 2 ? _tx('<button class="btn secondary" data-act="photo-compare">השוואה</button>') : ''}</div>
+  h += `<div class="btn-row mt"><button class="btn secondary" data-act="photo-add">${_tx`${ICON.cam} תמונה חדשה`}</button>${items.length >= 2 ? `<button class="btn secondary" data-act="photo-compare">${_tx('השוואה')}${plusBadge()}</button>` : ''}</div>
   <p class="tiny muted mt">${_tx`התמונות נשמרות באזור הפרטי שלכם ולא נשלחות לשום ניתוח.`}</p>`;
   return h;
 }
@@ -2972,7 +3069,7 @@ function questionsListHTML() {
 }
 function doctorBody() {
   return `<p class="lead" style="margin-top:6px">${_tx`לפני ביקור אפשר להכין סיכום של הטיפול, ולרשום שאלות כשהן עולות.`}</p>
-  <div class="btn-row"><button class="btn" data-act="report">${_tx`דוח PDF`}</button><button class="btn secondary" data-act="summary">${_tx`סיכום בטקסט`}</button></div>
+  <div class="btn-row"><button class="btn" data-act="report">${_tx`דוח PDF`}${plusBadge()}</button><button class="btn secondary" data-act="summary">${_tx`סיכום בטקסט`}</button></div>
   <p class="tiny muted mt">${_tx`הדוח כולל מינונים, הזרקות, רמה משוערת של התרופה, משקל, תופעות לוואי, תזונה ותוספים.`}</p>
   <h2 class="h-section">${_tx`שאלות לרופא`}</h2>${questionsListHTML()}`;
 }
@@ -4028,7 +4125,7 @@ function openSettings() {
   const ai = BYOK_ON ? AIKeys.read() : null, aiTxt = ai ? `${AI_PROVIDERS[ai.provider].label} · ${ai.keys[ai.provider] ? _tx('מחובר') : _tx('אין מפתח')}` : '';
   const lockTxt = { none: _tx('כבויה'), pin: _tx('קוד'), bio: _tx('טביעת אצבע') }[Lock.method()];
   const g = GDrive.st(), backupTxt = GDrive.enabled() && GDrive.connected() ? `${_tx`גיבוי אוטומטי ל-Drive${g.last ? ` · ${fmtDay(new Date(g.last))}` : ''}`}` : `${_tx`גיבוי אחרון: ${lastBackupText()}`}`;
-  const plusRow = Plus.billing() ? `<div class="group" style="margin-bottom:14px"><button class="row" data-act="plus-open" data-f=""><span class="set-ico" aria-hidden="true">★</span><div class="grow"><div class="row-title">MyShot Plus</div><div class="row-sub">${Plus.st().active ? _tx('פעיל') : _tx('AI כלול, גיבוי אוטומטי, דוח לרופא ועוד')}</div></div>${ICON.chev}</button></div>` : '';
+  const plusRow = Plus.shown() ? `<button class="plus-card${Plus.isSub() ? ' on' : ''}" data-act="plus-open" data-f=""><span class="plus-card-star" aria-hidden="true">★</span><span class="plus-card-txt"><b>MyShot Plus</b><span>${Plus.isSub() ? _tx('פעיל · תודה שאתם איתנו') : _tx('AI בלי מפתח, גיבוי אוטומטי, דוח לרופא · אפשר לנסות בחינם')}</span></span>${ICON.chev}</button>` : '';
   const body = plusRow + `<div class="group">
       ${row('med', ICON.syr, _tx('התרופה והמינון'), esc(medTxt))}
       ${Native.on ? `<button class="row" data-act="rem-page"><span class="set-ico" aria-hidden="true">${icoBell()}</span><div class="grow"><div class="row-title">${_tx`תזכורות`}</div><div class="row-sub">${_tx`${remActiveCount()} פעילות`}</div></div>${ICON.chev}</button>` : ''}
@@ -4902,17 +4999,23 @@ document.addEventListener('click', e => {
     case 'rem-tday': { const v = +d.v; remSave(r => { const cur = r.trainDays || []; r.trainDays = cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v].sort((p, q) => p - q); }); break; }
     case 'set-go': openSetPage(d.p); break;
     case 'plus-open': openPaywall(d.f || ''); break;
-    case 'plus-buy': { const pkg = (F.pkgs || [])[+d.i]; if (!pkg) break; a.disabled = true; Plus.buy(pkg).then(st => { a.disabled = false; if (st && st.active) { Sheet.close(); AIKeys.setup(); App.render(); toast(_tx('MyShot Plus פעיל. תודה!')); } }).catch(() => { a.disabled = false; toast(_tx('הרכישה לא הושלמה. נסו שוב.'), 'alert'); }); break; }
-    case 'plus-restore': Plus.restore().then(st => { if (st && st.active) { Sheet.close(); App.render(); toast(_tx('המנוי שוחזר ✓')); } else toast(_tx('לא נמצא מנוי פעיל בחשבון Google הזה.'), 'alert'); }).catch(() => toast(_tx('השחזור לא הצליח. נסו שוב.'), 'alert')); break;
+    case 'pw-sel': PW.sel = +d.i; PW.keepScroll = true; Paywall.show(paywallHTML(PW.pkgs)); break;
+    case 'pw-close': Paywall.close(); break;
+    case 'pw-buy': { const pk = PW.pkgs[PW.sel]; if (!pk) break;
+      if (!Plus.billing()) { confirmBox(_tx('זו גרסת פיתוח, ואין בה רכישה אמיתית. לדמות מנוי כדי לראות איך זה נראה?'), _tx('לדמות מנוי'), false).then(ok => { if (!ok) return; Plus.setSim('plus', pkgTrialDays(pk)); Paywall.show(plusWelcomeHTML()); App.render(); }); break; }
+      a.disabled = true; Plus.buy(pk).then(st => { a.disabled = false; if (st && st.active) { AIKeys.setup(); App.render(); Paywall.show(plusWelcomeHTML()); } }).catch(() => { a.disabled = false; toast(_tx('הרכישה לא הושלמה. נסו שוב.'), 'alert'); }); break; }
+    case 'plus-sim': Plus.setSim(d.v); App.render(); if (Plus.isSub()) Paywall.show(paywallActiveHTML()); else openPaywall(PW.feature); break;
+    case 'plus-card-hide': try { localStorage.setItem('mj-plus-card-hide', String(Date.now() + 30 * DAY)); } catch (e) {} App.render(); break;
+    case 'plus-restore': if (!Plus.billing()) { toast(_tx('שחזור רכישה פועל בגרסה מ-Google Play.')); break; } Plus.restore().then(st => { if (st && st.active) { Sheet.close(); App.render(); Paywall.show(paywallActiveHTML()); toast(_tx('המנוי שוחזר ✓')); } else toast(_tx('לא נמצא מנוי פעיל בחשבון Google הזה.'), 'alert'); }).catch(() => toast(_tx('השחזור לא הצליח. נסו שוב.'), 'alert')); break;
     case 'plus-manage': { Lock.away(); window.open(Plus.st().manage || 'https://play.google.com/store/account/subscriptions?package=com.itranstudios.myshot', '_blank'); break; }
     case 'set-lang': { const v = LANGS.includes(d.v) ? d.v : 'he'; if (v === LANG) break; try { localStorage.setItem('mj-lang', v); } catch (e) {} try { Sync.flushAll(); } catch (e) {} setTimeout(() => location.reload(), 150); break; }
     case 'welcome-drive': welcomeDrive(); break;
     case 'welcome-new': Sheet.close(); setTimeout(() => openOnboarding(), 300); break;
     case 'welcome-back': welcomeBody(welcomeChoicesHTML()); break;
     case 'welcome-restore': welcomeRestore(d.id, d.name); break;
-    case 'offer-bio': Bio.auth(_tx('הפעלת פתיחה בטביעת אצבע')).then(r => { if (r.ok) { Lock.setBio(); Sheet.close(); toast(_tx('הנעילה בטביעת אצבע פועלת')); } else if (r.code !== 'cancel') toast(_tx('טביעת האצבע לא הופעלה. אפשר לנסות שוב בהגדרות ← פרטיות ונעילה.'), 'alert'); }); break;
-    case 'offer-pin': openPinSheet('new', () => Sheet.close()); break;
-    case 'offer-skip': Sheet.close(); break;
+    case 'offer-bio': Bio.auth(_tx('הפעלת פתיחה בטביעת אצבע')).then(r => { if (r.ok) { Lock.setBio(); Sheet.close(); toast(_tx('הנעילה בטביעת אצבע פועלת')); maybePlusIntro(); } else if (r.code !== 'cancel') toast(_tx('טביעת האצבע לא הופעלה. אפשר לנסות שוב בהגדרות ← פרטיות ונעילה.'), 'alert'); }); break;
+    case 'offer-pin': openPinSheet('new', () => { Sheet.close(); maybePlusIntro(); }); break;
+    case 'offer-skip': Sheet.close(); maybePlusIntro(); break;
     case 'set-back': if (F && typeof F.back === 'function') F.back(); else openSettings(); break;
     case 'lock-method': { const v = d.v; if (v === Lock.method()) break; Lock.verify().then(async ok => {
       if (!ok) return;
@@ -5028,6 +5131,7 @@ async function boot() {
   initOptional();
   if (Lock.on()) Lock.show();
   Plus.init();
+  try { localStorage.setItem('mj-opens', String((+localStorage.getItem('mj-opens') || 0) + 1)); } catch (e) {}
   setTimeout(() => GDrive.auto(), 5000);
   syncThemeBtn();
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => syncThemeBtn(true)); } catch (e) {}
