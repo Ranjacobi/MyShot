@@ -1,0 +1,15 @@
+# MyShot AI server on Cloudflare Workers. Setup steps: see "MyShot Plus" in README.md.
+name = "myshot-ai"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[[kv_namespaces]]
+binding = "QUOTA"
+id = "PUT_YOUR_KV_NAMESPACE_ID_HERE"
+
+[vars]
+FREE_LIMIT = "5"
+PLUS_LIMIT = "300"
+MODEL = "gemini-3.5-flash-lite"
+ENTITLEMENT = "plus"
+# Secrets (never in this file): GEMINI_API_KEY and RC_SECRET, set with `npx wrangler secret put`.

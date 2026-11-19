@@ -525,6 +525,7 @@ html.is-locked body>*:not(#lock){visibility:hidden}
 .set-ico{display:inline-flex;width:34px;height:34px;border-radius:10px;background:var(--surface-2);align-items:center;justify-content:center;color:var(--ink);flex:none}.set-ico svg{width:20px;height:20px}.set-back{display:inline-flex;align-items:center;gap:4px;background:none;border:0;color:var(--ink-2);font:inherit;font-size:15px;font-weight:600;padding:2px 0 12px;cursor:pointer}.set-back svg{width:18px;height:18px}.lock-bio-btn{margin-top:6px;min-height:56px;font-size:17px;gap:10px}
 .welcome-opts{display:flex;flex-direction:column;gap:10px}.wopt{display:flex;align-items:center;gap:14px;width:100%;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;font:inherit;color:var(--ink);cursor:pointer;min-height:68px;box-sizing:border-box}.wopt:active{background:var(--surface-2)}.wopt-ico{display:inline-flex;width:42px;height:42px;border-radius:12px;background:var(--surface-2);align-items:center;justify-content:center;flex:none}.wopt-ico svg{width:24px;height:24px}.wopt-txt{display:flex;flex-direction:column;gap:2px;min-width:0}.wopt .row-title{font-weight:600}.wopt input[type=file]{display:none}
 [dir=ltr] input[type=date],[dir=ltr] input[type=datetime-local],[dir=ltr] input[type=time],[dir=ltr] input[type=number]{text-align:left}[dir=ltr] .lightbox .icon-btn{left:auto;right:10px}[dir=ltr] .hn{direction:ltr;text-align:left}
+.plus-hero{text-align:center;margin:2px 0 10px}.plus-hero svg{width:56px;height:56px}.plus-hero h2{font-family:var(--font-display);margin:8px 0 4px;color:var(--ink)}.plus-list{list-style:none;padding:0;margin:0 0 14px}.plus-list li{padding:6px 0;padding-inline-start:28px;position:relative;color:var(--ink)}.plus-list li::before{content:'✓';position:absolute;inset-inline-start:4px;color:var(--ok);font-weight:700}#f-plans{display:flex;flex-direction:column;gap:10px}.plan{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;width:100%;padding:14px 16px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;text-align:start;box-sizing:border-box}.plan.best{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}.plan-name{font-weight:700}.plan-price{font-weight:700;font-size:18px}.plan-note{flex-basis:100%;font-size:13px;color:var(--ok)}.plus-lock{border:1.5px dashed var(--line);border-radius:16px;padding:16px;margin:14px 0}
 </style>
 </head>
 <body>
@@ -553,6 +554,7 @@ html.is-locked body>*:not(#lock){visibility:hidden}
 <div class="toast" id="toast" role="status" aria-live="polite"><span></span></div>
 
 <script src="google-config.js"></script>
+<script src="plus-config.js"></script>
 <script src="i18n-en.js"></script>
 <script src="i18n-ru.js"></script>
 <script src="i18n-es.js"></script>
@@ -807,8 +809,9 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 const CHANGELOG = [
+  ['1.9.0', _tx('MyShot Plus: מנוי עם AI כלול, גיבוי אוטומטי, דוח לרופא ותובנות')],
   ['1.8.0', _tx('רוסית, ספרדית וצרפתית בממשק, והתוכן הרפואי באנגלית')],
   ['1.7.1', _tx('המדריך הרפואי, כללי התרופות, הטיפים לתוספים ודוח ה-PDF באנגלית')],
   ['1.7.0', _tx('ממשק באנגלית: בחירת שפה בהגדרות ובמסך הפתיחה, והתאמה אוטומטית לשפת הטלפון בהתקנה חדשה')],
@@ -1365,7 +1368,7 @@ const GDrive = {
   },
   async download(id) { const tk = await this.token(true), r = await gReq(tk, 'GET', `https://www.googleapis.com/drive/v3/files/${id}?alt=media`); return typeof r === 'string' ? r : JSON.stringify(r); },
   async auto() {
-    if (!this.enabled() || !this.connected() || this.st().auto === false || this.inflight) return;
+    if (!this.enabled() || !this.connected() || this.st().auto === false || this.inflight || !Plus.active()) return;
     if (Date.now() - (this.st().last || 0) < 20 * HOUR) return;
     try { await this.backup(false); } catch (e) { this.save({ lastErr: Date.now() }); }
   },
@@ -1374,6 +1377,7 @@ const GDrive = {
 const driveErr = e => ({ no_plugin: _tx('רכיב ההתחברות ל-Google לא נכלל בגרסה הזו של האפליקציה.'), auth: _tx('לא הצלחנו להתחבר ל-Google. נסו שוב.'), network: _tx('אין חיבור לאינטרנט. נסו שוב אחר כך.'), drive: `${_tx`Google Drive החזיר שגיאה${e && e.status ? ` (${e.status})` : ''}. נסו שוב.`}` })[e && e.code] || _tx('משהו השתבש. נסו שוב.');
 function driveSettingsHTML() {
   if (!GDrive.enabled()) return '';
+  if (!Plus.active()) return plusLockedHTML('drive', _tx('גיבוי אוטומטי ל-Google Drive'));
   const s = GDrive.st();
   if (!GDrive.connected()) return `<div class="group" style="margin-top:12px"><button class="row" data-act="gd-connect"><div class="grow"><div class="row-title">${_tx`גיבוי אוטומטי ל-Google Drive`}</div><div class="row-sub">${_tx`מתחברים פעם אחת, ומשם הגיבוי נשמר כל יום בתיקייה MyShot בדרייב שלך`}</div></div>${ICON.chev}</button></div>`;
   const when = s.last ? `${fmtDay(new Date(s.last))}, ${fmtT(new Date(s.last))}` : _tx('עוד לא');
@@ -1446,6 +1450,85 @@ function offerLock() {
     <div class="welcome-opts">${wopt('offer-bio', icoFinger(), _tx('טביעת אצבע'), _tx('ואם היא לא מזוהה, קוד הנעילה של הטלפון'), ' id="offer-bio"')}${wopt('offer-pin', icoLock(), _tx('קוד'), _tx('4 עד 6 ספרות שתבחרו'))}</div>
     <p class="tiny muted" style="margin-top:12px">${_tx`אפשר לשנות או לבטל בכל רגע בהגדרות ← פרטיות ונעילה.`}</p>`, _tx('<button class="btn quiet" data-act="offer-skip">לא עכשיו</button>'));
   Bio.available().then(ok => { const b = $('#offer-bio'); if (b && !ok) b.remove(); });
+}
+
+
+/* ---------- MyShot Plus: a subscription through Google Play, managed by RevenueCat ----------
+   Builds without the RevenueCat key (development builds from GitHub) keep every feature open. */
+const PLUS_ENT = 'plus';
+const deviceId = () => { try { let v = localStorage.getItem('mj-did'); if (!v) { v = 'dev-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)); localStorage.setItem('mj-did', v); } return v; } catch (e) { return 'dev-anon'; } };
+const Plus = {
+  ready: false, uid: '',
+  key() { return window.MYSHOT_RC_KEY || ''; },
+  p() { return Native.plugin('Purchases'); },
+  billing() { return Native.on && !!this.key(); },
+  st() { try { return JSON.parse(localStorage.getItem('mj-plus') || '{}') || {}; } catch (e) { return {}; } },
+  active() { return !this.billing() || !!this.st().active; },
+  async init() {
+    if (!this.billing()) return;
+    const P = this.p(); if (!P) return;
+    try { await P.configure({ apiKey: this.key() }); this.ready = true; } catch (e) { return; }
+    try { const r = await P.getAppUserID(); this.uid = (r && r.appUserID) || ''; } catch (e) {}
+    await this.refresh();
+    AIKeys.setup();
+  },
+  apply(ci) {
+    const ent = ci && ci.entitlements && ci.entitlements.active ? ci.entitlements.active[PLUS_ENT] : null;
+    const st = { active: !!ent, until: (ent && ent.expirationDate) || null, renew: !!(ent && ent.willRenew), manage: (ci && ci.managementURL) || null, at: Date.now() };
+    const was = !!this.st().active;
+    try { localStorage.setItem('mj-plus', JSON.stringify(st)); } catch (e) {}
+    if (was !== st.active && App.ready && !Sheet.isOpen()) App.render();
+    return st;
+  },
+  async refresh() { const P = this.p(); if (!P || !this.ready) return this.st(); try { const r = await P.getCustomerInfo(); return this.apply(r && r.customerInfo); } catch (e) { return this.st(); } },
+  async offering() { const P = this.p(); if (!P || !this.ready) return null; try { const r = await P.getOfferings(); return (r && r.current) || null; } catch (e) { return null; } },
+  async buy(pkg) {
+    const P = this.p(); Lock.away();
+    try { const r = await P.purchasePackage({ aPackage: pkg }); return this.apply(r && r.customerInfo); }
+    catch (e) { if (e && (e.userCancelled || /cancel/i.test(String(e.code || e.message || '')))) return null; throw e; }
+  },
+  async restore() { const r = await this.p().restorePurchases(); return this.apply(r && r.customerInfo); },
+  require(feature, fn) { if (this.active()) fn(); else openPaywall(feature); },
+};
+// "AI included": requests go to your own small server, which holds the AI key, checks Plus and counts the monthly quota.
+const MyShotAI = {
+  url() { return String(window.MYSHOT_AI_URL || '').replace(/\/+$/, ''); },
+  on() { return Native.on && !!this.url(); },
+  user() { return Plus.uid || deviceId(); },
+  left() { const v = localStorage.getItem('mj-ai-left'); return v === null ? null : +v; },
+};
+const PLUS_WHY = () => ({ ai: _tx('נגמרו הזיהויים החינמיים של החודש.'), report: _tx('דוח ה-PDF לרופא עם גרפים הוא חלק מ-MyShot Plus.'), compare: _tx('השוואת תמונות ושכבה שקופה הן חלק מ-MyShot Plus.'), receipts: _tx('מעקב קבלות והחזרים מהביטוח הוא חלק מ-MyShot Plus.'), insights: _tx('התובנות על תופעות הלוואי הן חלק מ-MyShot Plus.'), drive: _tx('הגיבוי האוטומטי ל-Drive הוא חלק מ-MyShot Plus.'), reminders: _tx('בחינם אפשר עד 3 תזכורות משלך. ב-MyShot Plus אין הגבלה.') });
+const PLUS_LIST = () => [_tx('AI כלול, בלי מפתח: צילום ארוחות, תוויות, תוספים וקבלות'), _tx('גיבוי אוטומטי יומי ל-Google Drive'), _tx('דוח PDF לרופא עם גרפים'), _tx('תובנות על תופעות הלוואי לאורך זמן'), _tx('השוואת תמונות התקדמות'), _tx('קבלות והחזרים מהביטוח'), _tx('תזכורות משלך בלי הגבלה')];
+const plusListHTML = () => `<ul class="plus-list">${PLUS_LIST().map(t => `<li>${esc(t)}</li>`).join('')}</ul>`;
+async function openPaywall(feature) {
+  if (!Plus.billing()) return;
+  F = { kind: 'paywall', feature, pkgs: [] };
+  const st = Plus.st(), why = PLUS_WHY()[feature];
+  if (st.active) {
+    Sheet.open('MyShot Plus', `<div class="plus-hero">${LOGO_MARK}<h2>${_tx('MyShot Plus פעיל')}</h2>${st.until ? `<p class="muted">${st.renew ? `${_tx`מתחדש ב-${fmtD(new Date(st.until))}`}` : `${_tx`בתוקף עד ${fmtD(new Date(st.until))}`}`}</p>` : ''}</div>${plusListHTML()}`, `<button class="btn secondary" data-act="plus-manage">${_tx('ניהול המנוי ב-Google Play')}</button>`);
+    return;
+  }
+  Sheet.open('MyShot Plus', `<div class="plus-hero">${LOGO_MARK}<h2>MyShot Plus</h2>${why ? `<p class="muted">${esc(why)}</p>` : ''}</div>${plusListHTML()}
+    <div id="f-plans"><div class="scan-wait"><div class="spin" aria-hidden="true"></div></div></div>
+    <p class="tiny muted" style="margin-top:12px">${_tx('המנוי מתחדש אוטומטית עד שמבטלים. אפשר לבטל בכל רגע ב-Google Play, והגישה נשארת עד סוף התקופה ששולמה. הנתונים שלך נשארים שלך גם בלי מנוי.')}</p>`,
+    `<button class="btn quiet" data-act="plus-restore">${_tx('שחזור רכישה')}</button>`);
+  const off = await Plus.offering();
+  if (F.kind !== 'paywall') return;
+  const box = $('#f-plans'); if (!box) return;
+  const pkgs = (off && off.availablePackages) || []; F.pkgs = pkgs;
+  if (!pkgs.length) { box.innerHTML = `<div class="note warn">${_tx('לא הצלחנו לטעון את המחירים. בדקו את החיבור ונסו שוב.')}</div>`; return; }
+  const label = pk => pk.packageType === 'ANNUAL' ? _tx('שנתי') : pk.packageType === 'MONTHLY' ? _tx('חודשי') : ((pk.product && pk.product.title) || pk.identifier);
+  const trial = pk => { const pr = pk.product || {}; return !!(pr.introPrice || (pr.defaultOption && pr.defaultOption.freePhase)); };
+  box.innerHTML = pkgs.slice().sort((a, b) => (b.packageType === 'ANNUAL') - (a.packageType === 'ANNUAL')).map(pk => `<button class="plan${pk.packageType === 'ANNUAL' ? ' best' : ''}" data-act="plus-buy" data-i="${pkgs.indexOf(pk)}"><span class="plan-name">${esc(label(pk))}</span><span class="plan-price">${esc((pk.product && pk.product.priceString) || '')}</span>${trial(pk) ? `<span class="plan-note">${_tx('כולל תקופת ניסיון חינם')}</span>` : ''}</button>`).join('');
+}
+function plusLockedHTML(feature, title) {
+  return `<div class="plus-lock"><div class="row-title">${esc(title)}</div><p class="small muted" style="margin:4px 0 10px">${esc(PLUS_WHY()[feature] || '')}</p><button class="chip" data-act="plus-open" data-f="${feature}">MyShot Plus</button></div>`;
+}
+function myshotAiNoteHTML() {
+  if (!MyShotAI.on()) return '';
+  const c = AIKeys.read(), own = !!c.keys[c.provider], left = MyShotAI.left();
+  const quota = Plus.billing() && Plus.active() ? '' : left !== null ? ` ${_tx`נשארו החודש ${left} זיהויים חינמיים.`}` : ` ${_tx('בחינם: 5 זיהויים בחודש.')}`;
+  return `<div class="note info" style="margin-bottom:14px">${own ? _tx('יש לך מפתח משלך, ולכן הזיהוי עובר ישירות לספק שבחרת.') : `${_tx('בלי מפתח משלך, הזיהוי עובר דרך MyShot AI.')}${quota}`}</div>`;
 }
 
 /* ---------- photos through the native camera (Android) ---------- */
@@ -1548,7 +1631,7 @@ const AIKeys = {
   setup() {
     if (!BYOK_ON) return;
     const c = AIKeys.read(), key = c.keys[c.provider];
-    if (!key) { App.sample = null; App.sampleImg = false; return; }
+    if (!key) { if (MyShotAI.on()) { App.sampleOff = false; App.sample = aiClient('myshot', MyShotAI.user(), ''); App.sampleImg = true; } else { App.sample = null; App.sampleImg = false; } return; }
     App.sampleOff = false; App.sample = aiClient(c.provider, key, c.models[c.provider] || ''); App.sampleImg = true;
     if (AIModels.stale(c.provider)) AIModels.refresh(c.provider, key).catch(() => {});
   },
@@ -1612,11 +1695,12 @@ async function aiPost(url, headers, body) {
   if (H && typeof H.request === 'function') {
     let r; try { r = await H.request({ url, method: 'POST', headers, data: body, responseType: 'json' }); } catch (e) { throw { code: 'network' }; }
     let data = r && r.data; if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) {} }
-    return { status: r ? r.status : 0, data };
+    return { status: r ? r.status : 0, data, headers: (r && r.headers) || {} };
   }
   let r; try { r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }); } catch (e) { throw { code: 'network' }; }
   let data = null; try { data = await r.json(); } catch (e) {}
-  return { status: r.status, data };
+  const hd = {}; try { r.headers.forEach((v, k) => { hd[k] = v; }); } catch (e) {}
+  return { status: r.status, data, headers: hd };
 }
 function aiClient(provider, key, modelOverride) {
   const P = AI_PROVIDERS[provider] || AI_PROVIDERS.anthropic;
@@ -1625,7 +1709,11 @@ function aiClient(provider, key, modelOverride) {
   const withTimeout = pr => new Promise((res, rej) => { const t = setTimeout(() => rej({ code: 'timeout', provider }), AI_TIMEOUT); pr.then(v => { clearTimeout(t); res(v); }, e => { clearTimeout(t); rej(e); }); });
   const attempt = async (model, text, imgs, think) => {
     let url, headers, body;
-    if (provider === 'openai') {
+    if (provider === 'myshot') {
+      url = MyShotAI.url() + '/v1/generate';
+      headers = { 'content-type': 'application/json', 'x-myshot-user': key };
+      body = { contents: [{ role: 'user', parts: [...imgs.map(i => ({ inline_data: { mime_type: i.type, data: i.data } })), { text }] }] };
+    } else if (provider === 'openai') {
       url = 'https://api.openai.com/v1/chat/completions';
       headers = { 'content-type': 'application/json', authorization: 'Bearer ' + key };
       body = { model, messages: [{ role: 'user', content: [{ type: 'text', text }, ...imgs.map(i => ({ type: 'image_url', image_url: { url: `data:${i.type};base64,${i.data}` } }))] }] };
@@ -1640,15 +1728,18 @@ function aiClient(provider, key, modelOverride) {
       body = { model, max_tokens: 4000, messages: [{ role: 'user', content: [...imgs.map(i => ({ type: 'image', source: { type: 'base64', media_type: i.type, data: i.data } })), { type: 'text', text }] }] };
     }
     const r = await withTimeout(aiPost(url, headers, body)), d = (r && r.data) || {}, st = r ? r.status : 0;
+    if (provider === 'myshot' && r && r.headers) { const h = r.headers, left = h['x-myshot-remaining'] !== undefined ? h['x-myshot-remaining'] : h['X-Myshot-Remaining']; if (left !== undefined) { try { localStorage.setItem('mj-ai-left', String(left)); } catch (e) {} } }
     if (st >= 200 && st < 300) {
       if (provider === 'openai') return String((((d.choices || [])[0] || {}).message || {}).content || '');
-      if (provider === 'gemini') return ((((d.candidates || [])[0] || {}).content || {}).parts || []).filter(x => !x.thought).map(x => x.text || '').join('');
+      if (provider === 'gemini' || provider === 'myshot') return ((((d.candidates || [])[0] || {}).content || {}).parts || []).filter(x => !x.thought).map(x => x.text || '').join('');
       return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
     }
     const raw = d.error || (Array.isArray(d) && d[0] && d[0].error) || {};
     const msg = String(raw.message || raw.status || raw.type || ''), ecode = String(raw.code || raw.type || raw.status || '');
     let retry = null; for (const x of (raw.details || [])) if (x && x.retryDelay) retry = parseInt(x.retryDelay, 10) || null;
     const fail = c => ({ code: c, provider, model, status: st, detail: msg.slice(0, 160), retry });
+    if (provider === 'myshot' && st === 402) { setTimeout(() => openPaywall('ai'), 900); throw fail('plus_quota'); }
+    if (provider === 'myshot' && st === 401) throw fail('no_user');
     if (think && st === 400 && /thinking/i.test(msg)) return attempt(model, text, imgs, false);
     if (/limit:\s*0\b/.test(msg)) throw fail('not_in_tier');
     if (st === 401 || st === 403 || (st === 400 && /api[ _-]?key/i.test(msg))) throw fail('bad_key');
@@ -1660,13 +1751,13 @@ function aiClient(provider, key, modelOverride) {
     throw fail('upstream_error');
   };
   const call = async (prompt, opts = {}) => {
-    const first = modelOverride || AIModels.newest(provider), text = String(prompt), imgs = [];
+    const first = provider === 'myshot' ? 'myshot' : (modelOverride || AIModels.newest(provider)), text = String(prompt), imgs = [];
     for (const im of (opts.images || [])) imgs.push({ type: /^image\/(jpeg|png|webp|gif)$/.test(im.type || '') ? im.type : 'image/jpeg', data: await toB64(im) });
     const think = provider === 'gemini' && /^gemini-3/.test(first) && !/lite/.test(first);
     try { return await attempt(first, text, imgs, think); }
     catch (e) {
       // The chosen model is gone, or hit its limit: try the next cheap model once (each model has its own quota).
-      const retry = e.code === 'bad_model' || (['rate_limited', 'not_in_tier', 'busy', 'timeout'].includes(e.code) && provider === 'gemini');
+      const retry = provider !== 'myshot' && e.code === 'bad_model' || (['rate_limited', 'not_in_tier', 'busy', 'timeout'].includes(e.code) && provider === 'gemini');
       const next = retry ? AIModels.list(provider).map(m => m.id).find(id => id !== first) || (provider === 'gemini' && P.lite !== first ? P.lite : null) : null;
       if (next) return attempt(next, text, imgs, false);
       throw e;
@@ -1868,7 +1959,7 @@ async function nativeBoot() {
       });
       AP.addListener('appRestoredResult', ev => { try { restorePhoto(ev); } catch (e) {} });
       AP.addListener('appStateChange', st => {
-        if (st && st.isActive) { Lock.onActive(); GDrive.auto(); nativeBars(); syncThemeBtn(); if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
+        if (st && st.isActive) { Lock.onActive(); Plus.refresh(); GDrive.auto(); nativeBars(); syncThemeBtn(); if (App.ready && !Sheet.isOpen()) App.render(); Reminders.refreshPerm().then(() => Reminders.soon(300)); }
         else { Lock.onBackground(); Sync.flushAll(); }
       });
     } catch (e) {}
@@ -2788,6 +2879,7 @@ function streaksHTML() {
   <div class="badges">${ms.map(m => `<span class="mbadge${m.done ? ' done' : ''}">${m.done ? '✓ ' : ''}${m.t}</span>`).join('')}</div>`;
 }
 function trendHTML() {
+  if (!Plus.active()) return plusLockedHTML('insights', _tx('מגמה לאורך זמן'));
   let h = `<h2 class="h-section">${_tx`מגמה לאורך זמן`}</h2>`;
   if (!S.symptoms.items.length) return h + _tx('<p class="lead">כשיצטברו תיעודים, יופיע כאן איך תופעות הלוואי משתנות משבוע לשבוע.</p>');
   const top = insights(90).types.slice(0, 4).map(t => t.k);
@@ -2832,6 +2924,7 @@ function photosHTML() {
 }
 
 function patternHTML() {
+  if (!Plus.active()) return plusLockedHTML('insights', _tx('הדפוס שלך בשבוע ההזרקה'));
   const cols = cycleProfile(60), total = cols.reduce((a, c) => a + c.n, 0), maxN = Math.max(1, ...cols.map(c => c.n));
   const h = `<h2 class="h-section">${_tx`הדפוס שלך בשבוע ההזרקה`}</h2>`;
   if (total < 3) return h + `<p class="lead">${_tx`אחרי כמה תיעודים של תופעות לוואי יופיע כאן באילו ימים אחרי ההזרקה הן מופיעות אצלך — כדי לתכנן מראש ארוחות קלות ומנוחה.`}</p>`;
@@ -3803,6 +3896,8 @@ function sampleErr(e) {
   if (c === 'invalid_json') return _tx('לא התקבלה תשובה ברורה. נסו שוב.');
   if (c === 'session_expired') return _tx('צריך להתחבר מחדש ל-Claude.');
   if (c === 'refused') return _tx('לא התקבלה תשובה לבקשה הזו.');
+  if (c === 'plus_quota') return _tx('נגמרו 5 הזיהויים החינמיים של החודש. ב-MyShot Plus אפשר להמשיך בלי הגבלה.');
+  if (c === 'no_user') return _tx('MyShot AI לא זמין כרגע. נסו שוב מאוחר יותר.');
   if (c === 'cancelled') return '';
   return _tx('משהו השתבש. נסו שוב.');
 }
@@ -3933,7 +4028,8 @@ function openSettings() {
   const ai = BYOK_ON ? AIKeys.read() : null, aiTxt = ai ? `${AI_PROVIDERS[ai.provider].label} · ${ai.keys[ai.provider] ? _tx('מחובר') : _tx('אין מפתח')}` : '';
   const lockTxt = { none: _tx('כבויה'), pin: _tx('קוד'), bio: _tx('טביעת אצבע') }[Lock.method()];
   const g = GDrive.st(), backupTxt = GDrive.enabled() && GDrive.connected() ? `${_tx`גיבוי אוטומטי ל-Drive${g.last ? ` · ${fmtDay(new Date(g.last))}` : ''}`}` : `${_tx`גיבוי אחרון: ${lastBackupText()}`}`;
-  const body = `<div class="group">
+  const plusRow = Plus.billing() ? `<div class="group" style="margin-bottom:14px"><button class="row" data-act="plus-open" data-f=""><span class="set-ico" aria-hidden="true">★</span><div class="grow"><div class="row-title">MyShot Plus</div><div class="row-sub">${Plus.st().active ? _tx('פעיל') : _tx('AI כלול, גיבוי אוטומטי, דוח לרופא ועוד')}</div></div>${ICON.chev}</button></div>` : '';
+  const body = plusRow + `<div class="group">
       ${row('med', ICON.syr, _tx('התרופה והמינון'), esc(medTxt))}
       ${Native.on ? `<button class="row" data-act="rem-page"><span class="set-ico" aria-hidden="true">${icoBell()}</span><div class="grow"><div class="row-title">${_tx`תזכורות`}</div><div class="row-sub">${_tx`${remActiveCount()} פעילות`}</div></div>${ICON.chev}</button>` : ''}
       ${row('goals', ICON.pulse, _tx('יעדים'), esc(goalsTxt))}
@@ -3971,7 +4067,7 @@ function openSetPage(p) {
   } else if (p === 'ai') {
     F = { kind: 'set', page: 'ai', back: toHub, aiProv: AIKeys.read().provider };
     const k = AIKeys.read().keys[F.aiProv]; if (k && AIModels.stale(F.aiProv)) setTimeout(() => refreshAIModels(F.aiProv, k, true), 300);
-    Sheet.open(_tx('בינה מלאכותית'), back + aiSettingsHTML().replace(/<h3[^>]*>בינה מלאכותית<\/h3>/, ''), save, sh => {
+    Sheet.open(_tx('בינה מלאכותית'), back + myshotAiNoteHTML() + aiSettingsHTML().replace(/<h3[^>]*>בינה מלאכותית<\/h3>/, ''), save, sh => {
       F.onChange = g => { if (g === 'aiProv') { const b = $('#f-aiblock', sh); if (b) b.innerHTML = aiBlockHTML(); const k2 = AIKeys.read().keys[F.aiProv]; if (k2 && AIModels.stale(F.aiProv)) refreshAIModels(F.aiProv, k2, true); } };
     });
   } else if (p === 'privacy') {
@@ -4695,7 +4791,7 @@ document.addEventListener('click', e => {
     case 'edit-weight': openWeightForm(d.id); break;
     case 'w-save': weightSave(); break;
     case 'w-del': weightDel(); break;
-    case 'add-receipt': openReceiptForm(); break;
+    case 'add-receipt': Plus.require('receipts', () => openReceiptForm()); break;
     case 'edit-receipt': openReceiptForm(d.id); break;
     case 'r-save': receiptSave(); break;
     case 'r-del': receiptDel(); break;
@@ -4754,13 +4850,13 @@ document.addEventListener('click', e => {
     case 'lvl-w': App.lvlW = !App.lvlW; App.render(); break;
     case 'period': App.period = d.k === 'month' ? 'month' : 'week'; App.render(); break;
     case 'trend': App.trendK = d.k || 'all'; App.render(); break;
-    case 'report': openReport(); break;
+    case 'report': Plus.require('report', () => openReport()); break;
     case 'report-save': if (F.pdf) saveFile(`myshot-report-${todayStr()}.pdf`, F.pdf, _tx('הדוח נשמר')); break;
     case 'photo-add': openPhotoSheet(); break;
     case 'photo-save': photoSave(); break;
     case 'photo-view': openPhotoView(d.id); break;
     case 'photo-del': photoDel(); break;
-    case 'photo-compare': openCompare(); break;
+    case 'photo-compare': Plus.require('compare', () => openCompare()); break;
     case 'zoom-src': if (F.src) lightbox(F.src); break;
     case 'plan-add': openPlanSheet(); break;
     case 'plan-save': planSave(); break;
@@ -4805,6 +4901,10 @@ document.addEventListener('click', e => {
     case 'steps-save': { const v = Math.round(numVal($('#f-steps'))); if (!(v >= 0 && v <= 100000)) { toast(_tx('מספר לא תקין'), 'alert'); break; } setDay(r => { r.steps = v; }); Sheet.close(); toast(_tx('הצעדים נשמרו')); break; }
     case 'rem-tday': { const v = +d.v; remSave(r => { const cur = r.trainDays || []; r.trainDays = cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v].sort((p, q) => p - q); }); break; }
     case 'set-go': openSetPage(d.p); break;
+    case 'plus-open': openPaywall(d.f || ''); break;
+    case 'plus-buy': { const pkg = (F.pkgs || [])[+d.i]; if (!pkg) break; a.disabled = true; Plus.buy(pkg).then(st => { a.disabled = false; if (st && st.active) { Sheet.close(); AIKeys.setup(); App.render(); toast(_tx('MyShot Plus פעיל. תודה!')); } }).catch(() => { a.disabled = false; toast(_tx('הרכישה לא הושלמה. נסו שוב.'), 'alert'); }); break; }
+    case 'plus-restore': Plus.restore().then(st => { if (st && st.active) { Sheet.close(); App.render(); toast(_tx('המנוי שוחזר ✓')); } else toast(_tx('לא נמצא מנוי פעיל בחשבון Google הזה.'), 'alert'); }).catch(() => toast(_tx('השחזור לא הצליח. נסו שוב.'), 'alert')); break;
+    case 'plus-manage': { Lock.away(); window.open(Plus.st().manage || 'https://play.google.com/store/account/subscriptions?package=com.itranstudios.myshot', '_blank'); break; }
     case 'set-lang': { const v = LANGS.includes(d.v) ? d.v : 'he'; if (v === LANG) break; try { localStorage.setItem('mj-lang', v); } catch (e) {} try { Sync.flushAll(); } catch (e) {} setTimeout(() => location.reload(), 150); break; }
     case 'welcome-drive': welcomeDrive(); break;
     case 'welcome-new': Sheet.close(); setTimeout(() => openOnboarding(), 300); break;
@@ -4834,7 +4934,7 @@ document.addEventListener('click', e => {
     case 'rem-tog': { const k = d.k; remSave(r => { r[k] = !r[k]; }); break; }
     case 'rem-set': { const k = d.k, v = +d.v; remSave(r => { if (k.includes('.')) { const [a, b] = k.split('.'); r[a][b] = v; } else r[k] = v; }); break; }
     case 'rem-test': Reminders.test(); break;
-    case 'rem-cnew': openCustomRem(null); break;
+    case 'rem-cnew': if (!Plus.active() && (remCfg().custom || []).length >= 3) { openPaywall('reminders'); break; } openCustomRem(null); break;
     case 'rem-cedit': openCustomRem(d.id); break;
     case 'rem-ctog': { const id = d.id; remSave(r => { const c = r.custom.find(x => x.id === id); if (c) c.on = !c.on; }); break; }
     case 'rem-csave': customRemSave(); break;
@@ -4927,6 +5027,7 @@ async function boot() {
   setInterval(() => { if (App.ready && !Sheet.isOpen()) App.render(); }, 5 * 60 * 1000);
   initOptional();
   if (Lock.on()) Lock.show();
+  Plus.init();
   setTimeout(() => GDrive.auto(), 5000);
   syncThemeBtn();
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => syncThemeBtn(true)); } catch (e) {}

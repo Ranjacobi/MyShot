@@ -59,6 +59,17 @@ jobs:
           npm install @capgo/capacitor-social-login@^8
           printf "window.MYSHOT_GOOGLE_WEB_CLIENT_ID = '%s';\n" "$GOOGLE_WEB_CLIENT_ID" > www/google-config.js
 
+      # MyShot Plus: only when the repository variable REVENUECAT_ANDROID_KEY is set (Play builds).
+      # MYSHOT_AI_URL is the address of your AI server (the Cloudflare Worker in proxy/).
+      - name: MyShot Plus subscription (optional)
+        if: ${{ vars.REVENUECAT_ANDROID_KEY != '' }}
+        env:
+          RC_KEY: ${{ vars.REVENUECAT_ANDROID_KEY }}
+          AI_URL: ${{ vars.MYSHOT_AI_URL }}
+        run: |
+          npm install @revenuecat/purchases-capacitor
+          printf "window.MYSHOT_RC_KEY = '%s';\nwindow.MYSHOT_AI_URL = '%s';\n" "$RC_KEY" "$AI_URL" > www/plus-config.js
+
       - name: Create the Android project
         run: |
           if [ ! -d android ]; then

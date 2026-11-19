@@ -67,6 +67,36 @@ Manage them on the **עוד → תזכורות** screen: switch each type on or 
 - On Android 14+, exact-time alarms need extra approval. Settings has a button for it; without it, Android may delay a reminder by a few minutes.
 - Some manufacturers stop notifications from apps they consider idle. If reminders don't arrive, exclude MyShot from battery optimization.
 
+## MyShot Plus
+
+MyShot is free, with an optional **MyShot Plus** subscription (monthly or yearly, with a free trial). Safety, tracking and the user's own data are never behind the subscription.
+
+- **Free:** doses, injections and every reminder, missed-dose rules, the guide and warning signs, the duplicate-dose check, the home ring and level chart, injection sites, side effects, weight, manual nutrition, supplements, workouts and steps, lock and discreet notifications, manual backup and export, all five languages, the text summary for the doctor, 5 AI recognitions a month and 3 reminders of your own. Your own AI key keeps working as an advanced option.
+- **Plus:** AI included with no key (meal and label photos, supplement scans, receipts, meal ideas), automatic daily backup to Google Drive, the PDF report with charts, side-effect insights, progress photo comparison, receipts and insurance refunds, and unlimited reminders of your own.
+- When a subscription ends, the data stays and can always be exported; only the Plus features stop.
+- **Builds without the RevenueCat key** (the development builds from GitHub) keep every feature open, so nothing changes until the Play build.
+
+### Setting it up
+
+1. **Signing key for Play.** Create an upload key once and keep the file and passwords safe:
+   `keytool -genkeypair -v -keystore myshot-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`
+   In GitHub → Settings → Secrets and variables → Actions, add the secrets `ANDROID_KEYSTORE_BASE64` (`base64 -i myshot-upload.jks | pbcopy`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`upload`) and `ANDROID_KEY_PASSWORD`. Each build then also produces `MyShot-release.aab` (the *MyShot-release* artifact).
+2. **RevenueCat** (free up to a monthly revenue threshold): create a project, add a Google Play app with the package `com.itranstudios.myshot`, and connect the Play service credentials as RevenueCat's guide describes. Create the entitlement `plus`. Copy the **public SDK key** (starts with `goog_`) into the GitHub repository variable `REVENUECAT_ANDROID_KEY`. The next build includes the subscription and the billing permission.
+3. **Google Play Console.** Upload that AAB to *Internal testing*. Then, under Monetize → Subscriptions, create `myshot_plus` with two base plans, `monthly` and `yearly`, and add a free-trial offer to the yearly plan. Set up the payments profile if Play asks for it. In RevenueCat, import the two products, attach them to the `plus` entitlement, and create the offering `default` with the Monthly and Annual packages.
+4. **The AI server** (Cloudflare Workers, in `proxy/`):
+   ```
+   cd proxy
+   npx wrangler login
+   npx wrangler kv namespace create QUOTA        # put the id it prints into wrangler.toml
+   npx wrangler secret put GEMINI_API_KEY        # a Gemini key with billing enabled
+   npx wrangler secret put RC_SECRET             # RevenueCat secret API key (starts with sk_)
+   npx wrangler deploy
+   ```
+   Put the address it prints (for example `https://myshot-ai.<name>.workers.dev`) into the repository variable `MYSHOT_AI_URL`. Limits are set in `wrangler.toml` (`FREE_LIMIT = 5`, `PLUS_LIMIT = 300` a month). The free Cloudflare plan limits KV writes per day, which is enough to start with.
+5. **Test the purchase.** In Play Console → Settings → License testing, add your Gmail address, install the app from the internal testing link, and buy: test purchases are free and renew quickly. Check that Plus opens the features, that *Restore purchase* works, and that cancelling in Google Play keeps access until the end of the period.
+
+Before publishing, the store listing needs a privacy policy and subscription terms; the paywall already states that the subscription renews automatically and can be cancelled anytime in Google Play.
+
 ## Language
 
 **Settings → שפה · Language** switches between **עברית**, **English**, **Русский**, **Español** and **Français**; the app reloads in the chosen language. The same choice appears on the welcome screen. A new install follows the phone's language (Hebrew, Russian, Spanish or French, and English for anything else); an existing install stays in Hebrew until you switch.
@@ -141,7 +171,7 @@ Never commit the release keystore; `.gitignore` already excludes `*.jks`. The pa
 
 ## Automated checks
 
-Every push first runs `tests/run_tests.py` in GitHub Actions (the **test** job): the app loads in headless Chromium with the Android plugins, AI providers and Google Drive mocked, and 33 checks cover reminders and discreet notifications, logging a dose from a notification (and the duplicate-dose guard), the back button, backup and restore, receipt and meal recognition, the model list and fallback, supplement scanning and its safety rules, the meal-to-supplement prompt, the app lock with a PIN and with fingerprint, the settings pages, the first-launch restore (Drive, a file, or starting fresh) and the lock offer, the English, Russian, Spanish and French interfaces (no Hebrew left on any screen, the phone's language on a new install, switching back and forth, the guide and the PDF report), training and steps, Drive backup and retention, and layout at 360 px. **The APK is built only if every check passes**, so an update that breaks something never reaches the phone.
+Every push first runs `tests/run_tests.py` in GitHub Actions (the **test** job): the app loads in headless Chromium with the Android plugins, AI providers and Google Drive mocked, and 38 checks cover reminders and discreet notifications, logging a dose from a notification (and the duplicate-dose guard), the back button, backup and restore, receipt and meal recognition, the model list and fallback, supplement scanning and its safety rules, the meal-to-supplement prompt, the app lock with a PIN and with fingerprint, the settings pages, the first-launch restore (Drive, a file, or starting fresh) and the lock offer, MyShot Plus (the paywall, buying and restoring, the locked features, MyShot AI and its free quota, and development builds staying open), the English, Russian, Spanish and French interfaces (no Hebrew left on any screen, the phone's language on a new install, switching back and forth, the guide and the PDF report), training and steps, Drive backup and retention, and layout at 360 px. **The APK is built only if every check passes**, so an update that breaks something never reaches the phone.
 
 To run them on your computer: `python3 -m pip install playwright && python3 -m playwright install chromium && python3 tests/run_tests.py`
 
