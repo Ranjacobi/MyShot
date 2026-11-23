@@ -566,7 +566,8 @@ async def no_horizontal_overflow_at_360px(b):
         await ctx.close()
 
 
-FRESH = "if (!localStorage.getItem('__fresh')) { localStorage.setItem('__mockdb', '{}'); localStorage.setItem('__fresh', '1'); }\n"
+FRESH_TOUR = "if (!localStorage.getItem('__fresh')) { localStorage.setItem('__mockdb', '{}'); localStorage.setItem('__fresh', '1'); }\n"
+FRESH = "if (!localStorage.getItem('__fresh')) { localStorage.setItem('__mockdb', '{}'); localStorage.setItem('__fresh', '1'); localStorage.setItem('mj-intro-done', '1'); }\n"   # tests of later steps skip the tour
 BACKUP = json.dumps({"app": "mounjaro-journal", "v": 2, "appVersion": "1.6.1", "exported": "2026-11-12T20:00:00Z", "docs": SEED, "images": {}, "photos": {}}, ensure_ascii=False)
 
 
@@ -1071,6 +1072,134 @@ async def plus_offered_after_first_setup_and_on_home(b):
         check(await page.locator('#app .plus-home').count() == 1, "no Plus card on the home screen")
         await page.click('#app .plus-home [data-act="plus-card-hide"]'); await tick(page, 2)
         check(await page.locator('#app .plus-home').count() == 0, "the home Plus card did not hide")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def tour_then_plus_then_welcome(b):
+    ctx, page, errs = await open_app(b, BIO, pre=FRESH_TOUR)
+    try:
+        await tick(page, 3)
+        check(await page.locator('#intro.open').count() == 1 and await page.locator('#intro .in-dots span').count() == 6, "the first launch did not open the tour with 6 pages")
+        check("המלווה שלך לטיפול" in await page.inner_text("#intro") and await page.locator('#intro [data-act="set-lang"]').count() == 5, "the first page has no title or language choice")
+        titles = []
+        for k in range(4):
+            await page.click('#intro [data-act="in-next"]'); await tick(page, 1); titles.append(await page.inner_text("#intro h1"))
+        check(titles == ["אף מנה לא נשכחת", "אוכלים נכון, בלי לחשב", "רואים את ההתקדמות", "פרטי ובטוח"], f"tour pages: {titles}")
+        await page.click('#intro [data-act="in-prev"]'); await tick(page, 1)
+        check(await page.inner_text("#intro h1") == "רואים את ההתקדמות", "back did not go one page back")
+        await page.click('#intro [data-act="in-next"]'); await page.click('#intro [data-act="in-next"]'); await tick(page, 3)
+        check(await page.locator('#intro.open').count() == 0 and await paywall(page), "the last page is not MyShot Plus")
+        await page.click('#paywall [data-act="pw-close"]'); await tick(page, 3)
+        check(await page.locator('#sheet.open').count() == 1 and "ברוכים הבאים" in await page.inner_text("#sheet .sheet-title"), "closing Plus did not continue to restore or setup")
+        check(await page.evaluate("[localStorage.getItem('mj-intro-done'), localStorage.getItem('mj-plus-intro')]") == ["1", "1"], "the tour will show again")
+        await page.click('[data-act="welcome-new"]'); await tick(page, 3)
+        await page.click('.sheet [data-pick="day"][data-val="4"]'); await page.click('[data-act="onb-save"]'); await settle(page, 0.3, 8)
+        await page.click('[data-act="offer-skip"]'); await tick(page, 4)
+        check(not await paywall(page), "Plus was offered twice in the first launch")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def tour_skip_and_replay(b):
+    ctx, page, errs = await open_app(b, pre=FRESH_TOUR)
+    try:
+        await tick(page, 3)
+        await page.click('#intro [data-act="in-skip"]'); await tick(page, 3)
+        check(await paywall(page), "skip did not go to the last page")
+        await page.click('#paywall [data-act="pw-close"]'); await tick(page, 3)
+        check("ברוכים הבאים" in await page.inner_text("#sheet .sheet-title"), "no welcome after skipping")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+    ctx, page, errs = await open_app(b)
+    try:
+        await tick(page, 2)
+        check(await page.locator('#intro.open').count() == 0, "an existing user got the tour")
+        await page.click('.tab[data-tab="more"]'); await tick(page, 2)
+        await page.click('[data-act="about"]'); await tick(page, 2)
+        await page.click('#sheet [data-act="intro-replay"]'); await tick(page, 3)
+        check(await page.locator('#intro.open').count() == 1, "the tour did not replay from About")
+        await page.click('#intro [data-act="in-skip"]'); await tick(page, 3)
+        await page.click('#paywall [data-act="pw-close"]'); await tick(page, 3)
+        check(await page.locator('#sheet.open').count() == 0, "replaying the tour opened the setup for an existing user")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def tour_in_english(b):
+    ctx, page, errs = await open_app(b, pre=FRESH_TOUR + EN_PRE)
+    try:
+        await tick(page, 3)
+        found = {}
+        for k in range(5):
+            found[k] = await hebrew_on_screen(page); await page.click('#intro [data-act="in-next"]'); await tick(page, 1)
+        bad = {k: v for k, v in found.items() if v}
+        check(not bad and await paywall(page), f"Hebrew in the English tour: {bad}")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+COUPON_OPTS = """window.__rcOpts = [{ id: 'yearly', isBasePlan: true, tags: [], pricingPhases: [{ price: { formatted: '₪99.00', amountMicros: 99000000 }, billingPeriod: { iso8601: 'P1Y' } }] },
+  { id: 'yearly:c20', isBasePlan: false, tags: ['coupon', 'rc-ignore-offer'], pricingPhases: [{ price: { formatted: '₪79.20', amountMicros: 79200000 }, billingPeriod: { iso8601: 'P1Y' }, billingCycleCount: 1 }, { price: { formatted: '₪99.00', amountMicros: 99000000 }, billingPeriod: { iso8601: 'P1Y' } }] }];
+const __go = window.Capacitor.Plugins.Purchases.getOfferings;
+window.Capacitor.Plugins.Purchases.getOfferings = async () => { const o = await __go(); o.current.availablePackages[1].product.subscriptionOptions = __rcOpts; return o; };
+window.Capacitor.Plugins.Purchases.purchaseSubscriptionOption = async o => { __rc.calls.push('option:' + o.subscriptionOption.id); __rc.active = true; return { customerInfo: __ci() }; };"""
+
+
+@test
+async def coupon_gives_the_discount_offer(b):
+    calls = []
+
+    async def coupons(route):
+        r = route.request; body = json.loads(r.post_data or '{}'); calls.append((r.url.split('/v1/')[1], body.get("code"), r.headers.get("x-myshot-user")))
+        if r.url.endswith('/v1/coupon/check'):
+            ok = body.get("code") == "SPRING20"
+            return await route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "offer": "c20", "plan": "yearly", "label": "20% הנחה בשנה הראשונה"} if ok else {"ok": False, "reason": "expired"}))
+        await route.fulfill(status=200, content_type="application/json", body='{"ok":true}')
+    ctx, page, errs = await open_app(b, HTTP + PURCHASES + COUPON_OPTS + "window.MYSHOT_AI_URL = 'https://ai.example.test';", routes=[("https://ai.example.test/**", coupons)])
+    try:
+        await tick(page, 4)
+        await open_doctor_report(page); await tick(page, 3)
+        await page.click('#paywall [data-act="pw-coupon"]'); await tick(page, 1)
+        await page.fill('#pw-code', 'oldcode'); await page.click('#paywall [data-act="pw-coupon-apply"]'); await settle(page, 0.3, 4)
+        check("תוקף הקופון הסתיים" in await page.inner_text("#paywall"), "an expired coupon did not explain why")
+        await page.fill('#pw-code', ' spring20 '); await page.click('#paywall [data-act="pw-coupon-apply"]'); await settle(page, 0.3, 4)
+        check(("coupon/check", "SPRING20", "$RCAnonymousID:test123") in calls, f"the code was not checked with the server as typed and normalized: {calls}")
+        on = await page.inner_text('#paywall .pw-plan.on')
+        check("₪79.20 לשנה הראשונה" in on and "SPRING20" in await page.inner_text('#paywall .pw-coupon.on'), f"the yearly plan does not show the coupon price: {on}")
+        check("ניסיון" not in on, f"the yearly card still promises a free trial with a coupon offer: {on}")
+        check("עם הקופון" in await page.inner_text('#paywall [data-act="pw-buy"]') and "עם הקופון: ₪79.20 לשנה הראשונה, ואחר כך ₪99.00 לשנה" in await page.inner_text('#paywall .pw-terms'), "the button or charge line ignores the coupon")
+        check(await page.locator('#paywall .pw-tl').count() == 0, "the free-trial timeline shows with a coupon offer")
+        await page.click('#paywall [data-act="pw-buy"]'); await settle(page, 0.5, 6)
+        check("option:yearly:c20" in await page.evaluate("__rc.calls"), f"the coupon's offer was not the one bought: {await page.evaluate('__rc.calls')}")
+        check(("coupon/redeem", "SPRING20", "$RCAnonymousID:test123") in calls, "the redemption was not reported to the server")
+        check("ברוכים הבאים ל-MyShot Plus" in await page.inner_text("#paywall"), "no welcome after buying with a coupon")
+        check(not errs, f"JS errors: {errs}")
+    finally:
+        await ctx.close()
+
+
+@test
+async def coupon_demo_in_a_development_build(b):
+    ctx, page, errs = await open_app(b)
+    try:
+        await page.click('[data-act="settings"]'); await tick(page, 2)
+        await page.click('#sheet .plus-card'); await tick(page, 3)
+        await page.click('#paywall [data-act="pw-coupon"]'); await tick(page, 1)
+        await page.fill('#pw-code', 'NOPE1'); await page.click('#paywall [data-act="pw-coupon-apply"]'); await tick(page, 2)
+        check("יפעלו אחרי שיוגדר שרת" in await page.inner_text("#paywall"), "a code without a server did not explain that coupons need the server")
+        await page.fill('#pw-code', 'demo20'); await page.click('#paywall [data-act="pw-coupon-apply"]'); await tick(page, 2)
+        check("79.2" in await page.inner_text('#paywall .pw-plan.on') and "קוד לדוגמה" in await page.inner_text('#paywall .pw-coupon.on'), "the demo coupon did not apply 20% to the yearly plan")
+        await page.click('#paywall [data-act="pw-coupon-x"]'); await tick(page, 1)
+        check(await page.locator('#paywall .pw-coupon.on').count() == 0 and await page.locator('#paywall .pw-tl').count() == 1, "removing the coupon did not restore the trial plan")
         check(not errs, f"JS errors: {errs}")
     finally:
         await ctx.close()

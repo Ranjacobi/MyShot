@@ -542,6 +542,13 @@ html.is-locked body>*:not(#lock){visibility:hidden}
 .plus-badge{display:inline-block;margin-inline-start:6px;padding:1px 7px;border-radius:999px;background:#F7D64A;color:#18224F;font-size:11px;font-weight:700;vertical-align:middle}
 .plus-home{display:flex;align-items:center;gap:6px;margin:14px 0;padding:6px 6px 6px 0;border-radius:18px;background:var(--surface);border:1.5px solid var(--line)}.plus-home-main{flex:1;display:flex;align-items:center;gap:12px;background:none;border:0;color:var(--ink);font:inherit;text-align:start;padding:10px 12px;cursor:pointer}.plus-home-main span span{display:block;font-size:13px;color:var(--ink-2)}.plus-home-star{width:34px;height:34px;flex:none;border-radius:10px;background:#F7D64A;color:#18224F;display:inline-flex;align-items:center;justify-content:center}
 #toast{z-index:9000}
+#intro{position:fixed;inset:0;z-index:61;display:none;flex-direction:column;background:var(--paper);color:var(--ink)}#intro.open{display:flex}
+.in-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px;padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 0}.in-lang{flex-wrap:wrap;gap:6px}.in-lang .chip{min-height:30px;padding:3px 10px;font-size:13px}
+.in-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px 28px}.in-art{width:190px;height:190px;margin-bottom:22px}.in-art svg{width:100%;height:100%}.in-logo{display:flex;align-items:center;justify-content:center;width:100%;height:100%}.in-logo svg{width:130px;height:130px}
+.in-body h1{font-family:var(--font-display);font-size:28px;margin:0 0 12px}.in-body p{margin:0;max-width:340px;font-size:17px;color:var(--ink-2)}
+.in-foot{padding:12px 20px calc(env(safe-area-inset-bottom,0px) + 16px)}.in-dots{display:flex;justify-content:center;gap:7px;margin-bottom:16px}.in-dots span{width:8px;height:8px;border-radius:99px;background:var(--line);transition:width .2s}.in-dots span.on{width:24px;background:var(--ink)}
+.pw-coupon-link{display:block;margin:12px auto 0}.pw-coupon{display:flex;gap:8px;align-items:center;margin-top:14px}.pw-coupon input{flex:1;min-width:0;text-transform:uppercase;letter-spacing:.06em}.pw-coupon.on{justify-content:space-between;padding:10px 14px;border-radius:14px;background:var(--ok-soft);color:var(--ink)}.pw-coupon-err{margin:6px 2px 0;font-size:13px;color:var(--alert)}
+.pw-plan.has-coupon{flex-wrap:wrap}.pw-plan-coupon{flex-basis:100%;font-size:13px;font-weight:700;color:var(--ok)}
 </style>
 </head>
 <body>
@@ -825,8 +832,9 @@ const Native = (() => {
   return { on, plugin };
 })();
 
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.10.0';
 const CHANGELOG = [
+  ['1.10.0', _tx('סיור פתיחה שמסביר את האפליקציה ומסתיים ב-MyShot Plus, וקודי קופון להנחה')],
   ['1.9.1', _tx('מסך Plus חדש במסך מלא, Plus גלוי בהגדרות, בבית ובתכונות, ותצוגה מקדימה בגרסת פיתוח')],
   ['1.9.0', _tx('MyShot Plus: מנוי עם AI כלול, גיבוי אוטומטי, דוח לרופא ותובנות')],
   ['1.8.0', _tx('רוסית, ספרדית וצרפתית בממשק, והתוכן הרפואי באנגלית')],
@@ -890,6 +898,7 @@ function openAbout() {
     <p class="about-name">${_tx`רן יעקבי`}</p>
     <p class="about-studio">ItRan Studios</p>
     <p class="tiny muted about-hint" id="about-hint">${_tx`יש כאן הפתעה קטנה. נסו להקיש על הטבעת.`}</p>
+    <button class="chip" data-act="intro-replay" style="margin-top:10px">${_tx('סיור באפליקציה')}</button>
   </div>`;
   Sheet.open(_tx('אודות'), body);
 }
@@ -1521,6 +1530,11 @@ const Plus = {
     catch (e) { if (e && (e.userCancelled || /cancel/i.test(String(e.code || e.message || '')))) return null; throw e; }
   },
   async restore() { const r = await this.p().restorePurchases(); return this.apply(r && r.customerInfo); },
+  async buyOption(opt) {
+    const P = this.p(); Lock.away();
+    try { const r = await P.purchaseSubscriptionOption({ subscriptionOption: opt }); return this.apply(r && r.customerInfo); }
+    catch (e) { if (e && (e.userCancelled || /cancel/i.test(String(e.code || e.message || '')))) return null; throw e; }
+  },
   require(feature, fn) { if (this.active()) fn(); else openPaywall(feature); },
 };
 // "AI included": requests go to your own small server, which holds the AI key, checks Plus and counts the monthly quota.
@@ -1544,7 +1558,8 @@ const Paywall = {
   isOpen() { return !!(this.el && this.el.classList.contains('open')); },
   mount() { if (!this.el) { const d = document.createElement('div'); d.id = 'paywall'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', 'MyShot Plus'); document.body.appendChild(d); this.el = d; } return this.el; },
   show(html) { const d = this.mount(); const top = d.querySelector('.pw-scroll'), y = top ? top.scrollTop : 0; d.innerHTML = html; d.classList.add('open'); document.documentElement.classList.add('pw-open'); const n = d.querySelector('.pw-scroll'); if (n && PW.keepScroll) n.scrollTop = y; PW.keepScroll = false; },
-  close() { if (!this.el) return; this.el.classList.remove('open'); this.el.innerHTML = ''; document.documentElement.classList.remove('pw-open'); },
+  onClose: null,
+  close() { if (!this.el) return; this.el.classList.remove('open'); this.el.innerHTML = ''; if (!Intro.isOpen()) document.documentElement.classList.remove('pw-open'); const f = this.onClose; this.onClose = null; if (f) f(); },
 };
 function annualSaving(pkgs) {
   const y = pkgs.find(pkgIsYear), m = pkgs.find(x => x.packageType === 'MONTHLY');
@@ -1571,18 +1586,27 @@ function paywallHTML(pkgs) {
     : pkgs.map((pk, i) => ({ pk, i })).sort((a, b) => pkgIsYear(b.pk) - pkgIsYear(a.pk)).map(({ pk, i }) => {
         const yr = pkgIsYear(pk), pr = pk.product || {}, d = pkgTrialDays(pk), on = i === PW.sel;
         const pm = yr && pr.price ? fmtMoney(pr.price / 12, pr.currencyCode) : '';
-        return `<button class="pw-plan${on ? ' on' : ''}" role="radio" aria-checked="${on}" data-act="pw-sel" data-i="${i}">${yr ? `<span class="pw-badge">${saving > 0 ? _tx`הכי משתלם · חיסכון ${saving}%` : _tx('הכי משתלם')}</span>` : ''}<span class="pw-radio" aria-hidden="true"></span><span class="pw-plan-main"><span class="pw-plan-name">${yr ? _tx('שנתי') : _tx('חודשי')}</span>${d ? `<span class="pw-plan-trial">${_tx`${d} ימי ניסיון חינם`}</span>` : ''}</span><span class="pw-plan-price">${esc(pr.priceString || '')}<small>${yr ? _tx('לשנה') : _tx('לחודש')}</small>${pm ? `<small class="pw-pm">${_tx`${pm} לחודש`}</small>` : ''}</span></button>`;
+        const cp = PW.coupon && PW.coupon.pkg === i ? `<span class="pw-plan-coupon">🏷️ ${esc(Coupons.phaseText(PW.coupon.option))}</span>` : '';
+        return `<button class="pw-plan${on ? ' on' : ''}${cp ? ' has-coupon' : ''}" role="radio" aria-checked="${on}" data-act="pw-sel" data-i="${i}">${yr ? `<span class="pw-badge">${saving > 0 ? _tx`הכי משתלם · חיסכון ${saving}%` : _tx('הכי משתלם')}</span>` : ''}<span class="pw-radio" aria-hidden="true"></span><span class="pw-plan-main"><span class="pw-plan-name">${yr ? _tx('שנתי') : _tx('חודשי')}</span>${d && !cp ? `<span class="pw-plan-trial">${_tx`${d} ימי ניסיון חינם`}</span>` : ''}</span><span class="pw-plan-price">${esc(pr.priceString || '')}<small>${yr ? _tx('לשנה') : _tx('לחודש')}</small>${pm ? `<small class="pw-pm">${_tx`${pm} לחודש`}</small>` : ''}</span>${cp}</button>`;
       }).join('');
-  const d = sel ? pkgTrialDays(sel) : 0;
+  const withCoupon = !!(PW.coupon && PW.coupon.pkg === PW.sel);
+  const d = sel && !withCoupon ? pkgTrialDays(sel) : 0;
+  const couponBox = !pkgs || !pkgs.length ? '' : PW.coupon ? `<div class="pw-coupon on"><span>🏷️ <b>${esc(PW.coupon.code)}</b> · ${esc(PW.coupon.label)}</span><button class="pw-link" data-act="pw-coupon-x">${_tx('הסרה')}</button></div>`
+    : PW.couponOpen ? `<div class="pw-coupon"><input id="pw-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="32" placeholder="${_tx('קוד קופון')}" value="${esc(PW.couponCode || '')}"><button class="btn secondary" data-act="pw-coupon-apply">${_tx('החלה')}</button></div>${PW.couponErr ? `<p class="pw-coupon-err" role="alert">${esc(PW.couponErr)}</p>` : ''}`
+    : `<button class="pw-link pw-coupon-link" data-act="pw-coupon">${_tx('יש לי קוד קופון')}</button>`;
   const timeline = d ? `<div class="pw-tl"><h3>${_tx('איך עובד הניסיון החינמי')}</h3><ol><li><b>${_tx('היום')}</b><span>${_tx('גישה מלאה לכל מה שב-Plus')}</span></li><li><b>${_tx`יום ${Math.max(1, d - 2)}`}</b><span>${_tx('נזכיר לך שהניסיון עומד להסתיים')}</span></li><li><b>${_tx`יום ${d}`}</b><span>${_tx('החיוב מתחיל, אלא אם ביטלת לפני כן ב-Google Play')}</span></li></ol></div>` : '';
-  return paywallTopHTML() + `<div class="pw-scroll">
+  const terms = withCoupon ? _tx`עם הקופון: ${Coupons.phaseText(PW.coupon.option)}, ואחר כך ${pkgPrice(sel)} ${pkgIsYear(sel) ? _tx('לשנה') : _tx('לחודש')}. אפשר לבטל בכל רגע ב-Google Play.` : sel ? billingLine(sel) : '';
+  return paywallTopHTML() + `<div class="pw-scroll">` + paywallBodyHTML(why, pwListHTML, plans, couponBox, timeline) + `</div>
+  <div class="pw-foot">${sel ? `<button class="btn pw-cta" data-act="pw-buy">${withCoupon ? _tx('להצטרף עם הקופון') : d ? _tx('להתחיל ניסיון חינם') : _tx('להצטרף ל-MyShot Plus')}</button><p class="pw-terms">${esc(terms)}</p>` : ''}</div>`;
+
+}
+function paywallBodyHTML(why, list, plans, couponBox, timeline) {
+  return `
     <div class="pw-hero">${LOGO_MARK}<h1>MyShot <span>Plus</span></h1><p>${esc(why || _tx('פחות עבודה, יותר תמיכה: AI בלי מפתח, גיבוי אוטומטי ודוח לרופא.'))}</p></div>
-    ${pwListHTML()}
+    ${list()}
     <p class="pw-free">${_tx('התזכורות, המעקב, המדריך והנתונים שלך נשארים בחינם, תמיד.')}</p>
     <div class="pw-plans" role="radiogroup" aria-label="${_tx('בחירת מסלול')}">${plans}</div>
-    ${timeline}${devSimHTML()}
-  </div>
-  <div class="pw-foot">${sel ? `<button class="btn pw-cta" data-act="pw-buy">${d ? _tx('להתחיל ניסיון חינם') : _tx('להצטרף ל-MyShot Plus')}</button><p class="pw-terms">${esc(billingLine(sel))}</p>` : ''}</div>`;
+    ${couponBox}${timeline}${devSimHTML()}`;
 }
 function paywallActiveHTML() {
   const st = Plus.st();
@@ -1596,7 +1620,8 @@ function plusWelcomeHTML() {
 async function openPaywall(feature, opts = {}) {
   if (!Plus.shown()) return;
   if (Sheet.isOpen()) Sheet.close();
-  PW = { feature: feature || '', pkgs: [], sel: -1, source: opts.source || '' };
+  PW = { feature: feature || '', pkgs: [], sel: -1, source: opts.source || '', coupon: null, couponOpen: false, couponErr: '', couponCode: '' };
+  Paywall.onClose = opts.onClose || null;
   if (Plus.isSub()) { Paywall.show(paywallActiveHTML()); return; }
   Paywall.show(paywallHTML(null));
   const pkgs = Plus.billing() ? ((((await Plus.offering()) || {}).availablePackages) || []) : Plus.previewPkgs();
@@ -1625,6 +1650,81 @@ function myshotAiNoteHTML() {
   const quota = Plus.billing() && Plus.active() ? '' : left !== null ? ` ${_tx`נשארו החודש ${left} זיהויים חינמיים.`}` : ` ${_tx('בחינם: 5 זיהויים בחודש.')}`;
   return `<div class="note info" style="margin-bottom:14px">${own ? _tx('יש לך מפתח משלך, ולכן הזיהוי עובר ישירות לספק שבחרת.') : `${_tx('בלי מפתח משלך, הזיהוי עובר דרך MyShot AI.')}${quota}`}</div>`;
 }
+
+
+/* ---------- first launch: a short tour of the app, ending on MyShot Plus ---------- */
+const INTRO_ART = {
+  ring: `<svg viewBox="0 0 160 160"><circle cx="80" cy="80" r="62" fill="none" stroke="var(--line)" stroke-width="14"/><path d="M80 18a62 62 0 0 1 53.7 31" fill="none" stroke="var(--hl)" stroke-width="14" stroke-linecap="round"/><path d="M137 62a62 62 0 0 1 1 32" fill="none" stroke="var(--ink)" stroke-width="14" stroke-linecap="round"/><text x="80" y="92" text-anchor="middle" font-size="38" font-weight="700" fill="var(--ink)" font-family="var(--font-display)">6</text></svg>`,
+  bell: `<svg viewBox="0 0 160 160"><path d="M80 30c-20 0-34 15-34 36v22l-10 16h88l-10-16V66c0-21-14-36-34-36z" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="6" stroke-linejoin="round"/><path d="M68 112a12 12 0 0 0 24 0" fill="none" stroke="var(--ink)" stroke-width="6"/><circle cx="118" cy="44" r="18" fill="var(--hl)"/><path d="M110 44l6 6 10-12" fill="none" stroke="var(--hl-ink)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  plate: `<svg viewBox="0 0 160 160"><circle cx="76" cy="86" r="50" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="6"/><circle cx="76" cy="86" r="30" fill="none" stroke="var(--line)" stroke-width="5"/><circle cx="64" cy="78" r="8" fill="var(--ok)"/><circle cx="86" cy="92" r="9" fill="var(--hl)"/><rect x="104" y="20" width="44" height="34" rx="9" fill="var(--ink)"/><circle cx="126" cy="37" r="9" fill="none" stroke="var(--paper)" stroke-width="4"/></svg>`,
+  chart: `<svg viewBox="0 0 160 160"><rect x="22" y="26" width="116" height="108" rx="16" fill="var(--surface-2)"/><path d="M38 64l24 12 22-4 22 22 18 8" fill="none" stroke="var(--ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="124" cy="102" r="8" fill="var(--hl)" stroke="var(--ink)" stroke-width="4"/><path d="M38 118h86" stroke="var(--line)" stroke-width="4"/></svg>`,
+  shield: `<svg viewBox="0 0 160 160"><path d="M80 20l46 16v36c0 32-20 56-46 68-26-12-46-36-46-68V36z" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="6" stroke-linejoin="round"/><rect x="60" y="74" width="40" height="32" rx="7" fill="var(--ink)"/><path d="M68 74v-8a12 12 0 0 1 24 0v8" fill="none" stroke="var(--ink)" stroke-width="6"/><circle cx="80" cy="90" r="5" fill="var(--hl)"/></svg>`,
+};
+const INTRO = () => [
+  { art: 'ring', t: _tx('המלווה שלך לטיפול'), d: _tx('זריקה שבועית, זריקה יומית או כדור: MyShot זוכר בשבילך, מסביר ומחזיק הכול במקום אחד.') },
+  { art: 'bell', t: _tx('אף מנה לא נשכחת'), d: _tx('תזכורות מדויקות, הסבר ברור מה עושים כשמפספסים מנה, והצעה איפה להזריק הפעם.') },
+  { art: 'plate', t: _tx('אוכלים נכון, בלי לחשב'), d: _tx('מצלמים את הצלחת ומקבלים חלבון, קלוריות וסיבים. תוספים עם תזכורת בשעה הנכונה.') },
+  { art: 'chart', t: _tx('רואים את ההתקדמות'), d: _tx('משקל, תופעות לוואי ומה עזר לך, ודוח מסודר לרופא לפני כל ביקור.') },
+  { art: 'shield', t: _tx('פרטי ובטוח'), d: _tx('הנתונים נשמרים אצלך בטלפון. נעילה בקוד או בטביעת אצבע, והתראות שלא חושפות כלום.') },
+];
+const Intro = {
+  el: null, i: 0, replay: false,
+  isOpen() { return !!(this.el && this.el.classList.contains('open')); },
+  seen() { try { return !!localStorage.getItem('mj-intro-done'); } catch (e) { return true; } },
+  mount() {
+    if (this.el) return this.el;
+    const d = document.createElement('div'); d.id = 'intro'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', 'MyShot');
+    let x0 = null;
+    d.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+    d.addEventListener('touchend', e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) < 50) return; const fwd = document.documentElement.dir === 'rtl' ? dx > 0 : dx < 0; fwd ? this.next() : this.prev(); });
+    document.body.appendChild(d); this.el = d; return d;
+  },
+  render() {
+    const S = INTRO(), n = S.length, i = this.i, sl = S[i];
+    this.mount().innerHTML = `<div class="in-top">${i ? `<button class="pw-link" data-act="in-prev">${_tx('חזרה')}</button>` : `<div class="chips in-lang" role="group" aria-label="שפה · Language">${LANG_CHIPS()}</div>`}<button class="pw-link" data-act="in-skip">${_tx('דילוג')}</button></div>
+      <div class="in-body"><div class="in-art" aria-hidden="true">${i === 0 ? `<div class="in-logo">${LOGO_MARK}</div>` : INTRO_ART[sl.art]}</div><h1>${esc(sl.t)}</h1><p>${esc(sl.d)}</p></div>
+      <div class="in-foot"><div class="in-dots" role="img" aria-label="${_tx`עמוד ${i + 1} מתוך ${n + 1}`}">${Array.from({ length: n + 1 }, (_, k) => `<span class="${k === i ? 'on' : ''}"></span>`).join('')}</div><button class="btn pw-cta" data-act="in-next">${i === 0 ? _tx('בואו נתחיל') : _tx('המשך')}</button></div>`;
+  },
+  open(opts = {}) { this.replay = !!opts.replay; this.i = 0; this.render(); this.el.classList.add('open'); document.documentElement.classList.add('pw-open'); },
+  close() { if (!this.el) return; this.el.classList.remove('open'); this.el.innerHTML = ''; if (!Paywall.isOpen()) document.documentElement.classList.remove('pw-open'); },
+  next() { if (this.i < INTRO().length - 1) { this.i++; this.render(); } else this.toPlus(); },
+  prev() { if (this.i > 0) { this.i--; this.render(); } },
+  // the last page is MyShot Plus; closing it (or after buying) continues to restore or setup
+  toPlus() {
+    const replay = this.replay; this.close();
+    const done = () => { try { localStorage.setItem('mj-intro-done', '1'); } catch (e) {} if (!replay && freshInstall() && !Sheet.isOpen()) setTimeout(() => openWelcome(), 250); };
+    try { localStorage.setItem('mj-plus-intro', '1'); } catch (e) {}
+    if (Plus.shown() && !Plus.isSub()) openPaywall('', { source: 'onboarding', onClose: done }); else done();
+  },
+};
+
+/* ---------- coupons: codes you manage on your server, each opening a discount offer set up in Google Play ---------- */
+const Coupons = {
+  norm: c => String(c || '').trim().toUpperCase().replace(/\s+/g, ''),
+  async check(raw) {
+    const code = this.norm(raw);
+    if (!/^[A-Z0-9_-]{3,32}$/.test(code)) return { ok: false, reason: 'invalid' };
+    if (!MyShotAI.url()) return !Plus.billing() && code === 'DEMO20' ? { ok: true, code, offer: 'c20', plan: 'yearly', label: _tx('קוד לדוגמה: 20% הנחה בשנה הראשונה'), demo: true } : { ok: false, reason: 'no_server' };
+    try {
+      const r = await aiPost(MyShotAI.url() + '/v1/coupon/check', { 'content-type': 'application/json', 'x-myshot-user': MyShotAI.user() }, { code });
+      const d = (r && r.data) || {};
+      return d.ok ? { ok: true, code, offer: String(d.offer || ''), plan: d.plan || 'any', label: String(d.label || '') } : { ok: false, reason: d.reason || 'invalid' };
+    } catch (e) { return { ok: false, reason: 'network' }; }
+  },
+  redeem(code) { if (MyShotAI.url()) aiPost(MyShotAI.url() + '/v1/coupon/redeem', { 'content-type': 'application/json', 'x-myshot-user': MyShotAI.user() }, { code }).catch(() => {}); },
+  why(reason) {
+    return ({ expired: _tx('תוקף הקופון הסתיים.'), used: _tx('כבר השתמשת בקופון הזה.'), exhausted: _tx('הקופון הזה כבר נוצל עד הסוף.'), inactive: _tx('הקופון הזה לא פעיל.'), network: _tx('אין חיבור לאינטרנט. נסו שוב.'), unavailable: _tx('הקופון לא זמין כרגע בגרסה הזו.'), no_server: _tx('קופונים יפעלו אחרי שיוגדר שרת MyShot.') })[reason] || _tx('הקוד לא נמצא. בדקו אותו ונסו שוב.');
+  },
+  option(pkg, offer) { const opts = (pkg && pkg.product && pkg.product.subscriptionOptions) || []; return opts.find(o => !o.isBasePlan && (String(o.id || '').split(':')[1] === offer || (o.tags || []).includes(offer))) || null; },
+  demoOption(pkg) { const pr = (pkg && pkg.product) || {}; return { id: 'yearly:c20', tags: ['c20'], pricingPhases: [{ price: { formatted: fmtMoney((pr.price || 99) * 0.8, pr.currencyCode), amountMicros: Math.round((pr.price || 99) * 0.8e6) }, billingPeriod: { iso8601: 'P1Y' }, billingCycleCount: 1 }, { price: { formatted: pr.priceString || '' } }] }; },
+  phaseText(opt) {
+    const ph = opt && opt.pricingPhases && opt.pricingPhases[0]; if (!ph) return '';
+    const m = String((ph.billingPeriod && ph.billingPeriod.iso8601) || '').match(/P(\d+)([DWMY])/);
+    const months = Math.max(1, Math.round((m ? +m[1] * ({ D: 1 / 30, W: 0.25, M: 1, Y: 12 })[m[2]] : 1) * (ph.billingCycleCount || 1)));
+    const dur = months % 12 === 0 ? (months === 12 ? _tx('לשנה הראשונה') : _tx`ל-${months / 12} השנים הראשונות`) : (months === 1 ? _tx('לחודש הראשון') : _tx`ל-${months} החודשים הראשונים`);
+    return ph.price && +ph.price.amountMicros === 0 ? _tx`חינם ${dur}` : `${(ph.price && ph.price.formatted) || ''} ${dur}`;
+  },
+};
 
 /* ---------- photos through the native camera (Android) ---------- */
 const PHOTO_KINDS = ['meal', 'label', 'receipt', 'progress', 'supp'];
@@ -2047,6 +2147,7 @@ async function nativeBoot() {
   if (AP) {
     try {
       AP.addListener('backButton', () => {
+        if (Intro.isOpen()) { if (Intro.i > 0) Intro.prev(); return; }
         if (Paywall.isOpen()) { Paywall.close(); return; }
         if (Sheet.isOpen()) { if (F && typeof F.back === 'function') { F.back(); return; } Sheet.close(); return; }
         if (App.tab === 'more' && App.more) { App.more = null; App.render(); window.scrollTo(0, 0); return; }
@@ -5001,7 +5102,25 @@ document.addEventListener('click', e => {
     case 'plus-open': openPaywall(d.f || ''); break;
     case 'pw-sel': PW.sel = +d.i; PW.keepScroll = true; Paywall.show(paywallHTML(PW.pkgs)); break;
     case 'pw-close': Paywall.close(); break;
+    case 'pw-coupon': PW.couponOpen = true; PW.couponErr = ''; PW.keepScroll = true; Paywall.show(paywallHTML(PW.pkgs)); setTimeout(() => { const el = $('#pw-code'); if (el) el.focus(); }, 50); break;
+    case 'pw-coupon-x': PW.coupon = null; PW.keepScroll = true; Paywall.show(paywallHTML(PW.pkgs)); break;
+    case 'pw-coupon-apply': { const el = $('#pw-code'), code = el ? el.value : ''; a.disabled = true;
+      Coupons.check(code).then(res => {
+        PW.couponCode = code; PW.keepScroll = true;
+        if (!res.ok) { PW.couponErr = Coupons.why(res.reason); Paywall.show(paywallHTML(PW.pkgs)); return; }
+        const idx = res.plan === 'monthly' ? PW.pkgs.findIndex(x => x.packageType === 'MONTHLY') : res.plan === 'yearly' ? PW.pkgs.findIndex(pkgIsYear) : PW.sel;
+        const pkg = PW.pkgs[idx], opt = res.demo ? Coupons.demoOption(pkg) : Coupons.option(pkg, res.offer);
+        if (!opt) { PW.couponErr = Coupons.why('unavailable'); Paywall.show(paywallHTML(PW.pkgs)); return; }
+        PW.coupon = { code: res.code, label: res.label, option: opt, pkg: idx, demo: !!res.demo }; PW.sel = idx; PW.couponOpen = false; PW.couponErr = '';
+        Paywall.show(paywallHTML(PW.pkgs));
+      }); break; }
+    case 'in-next': Intro.next(); break;
+    case 'in-prev': Intro.prev(); break;
+    case 'in-skip': Intro.toPlus(); break;
+    case 'intro-replay': Sheet.close(); setTimeout(() => Intro.open({ replay: true }), 250); break;
     case 'pw-buy': { const pk = PW.pkgs[PW.sel]; if (!pk) break;
+      const cpn = PW.coupon && PW.coupon.pkg === PW.sel ? PW.coupon : null;
+      if (cpn && Plus.billing()) { a.disabled = true; Plus.buyOption(cpn.option).then(st => { a.disabled = false; if (st && st.active) { Coupons.redeem(cpn.code); AIKeys.setup(); App.render(); Paywall.show(plusWelcomeHTML()); } }).catch(() => { a.disabled = false; toast(_tx('הרכישה לא הושלמה. נסו שוב.'), 'alert'); }); break; }
       if (!Plus.billing()) { confirmBox(_tx('זו גרסת פיתוח, ואין בה רכישה אמיתית. לדמות מנוי כדי לראות איך זה נראה?'), _tx('לדמות מנוי'), false).then(ok => { if (!ok) return; Plus.setSim('plus', pkgTrialDays(pk)); Paywall.show(plusWelcomeHTML()); App.render(); }); break; }
       a.disabled = true; Plus.buy(pk).then(st => { a.disabled = false; if (st && st.active) { AIKeys.setup(); App.render(); Paywall.show(plusWelcomeHTML()); } }).catch(() => { a.disabled = false; toast(_tx('הרכישה לא הושלמה. נסו שוב.'), 'alert'); }); break; }
     case 'plus-sim': Plus.setSim(d.v); App.render(); if (Plus.isSub()) Paywall.show(paywallActiveHTML()); else openPaywall(PW.feature); break;
@@ -5144,7 +5263,7 @@ async function boot() {
     if (Native.on) { Reminders.flush(); Reminders.soon(800); }
     if (App.afterReady) { const f = App.afterReady; App.afterReady = null; setTimeout(() => Lock.whenOpen(f), 300); }
     try { if (!localStorage.getItem('mj-lang')) { const pl = String(navigator.language || '').toLowerCase().slice(0, 2), want = !freshInstall() || pl === 'he' || pl === 'iw' ? 'he' : (LANGS.includes(pl) ? pl : 'en'); localStorage.setItem('mj-lang', want); if (want !== LANG) { location.reload(); return; } } } catch (e) {}
-    if (Backend.loaded.core && !S.core.settings.setup && !App.readOnly && !App.slow) setTimeout(() => { if (!Sheet.isOpen()) (freshInstall() ? openWelcome() : openOnboarding()); }, 300);
+    if (Backend.loaded.core && !S.core.settings.setup && !App.readOnly && !App.slow) setTimeout(() => { if (!Sheet.isOpen()) (freshInstall() ? (Intro.seen() ? openWelcome() : Intro.open()) : openOnboarding()); }, 300);
   };
   if (Backend.mode === 'cloud') Backend.startCloud(done);
   else { await Backend.loadLocal(); done(); }

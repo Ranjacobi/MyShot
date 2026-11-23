@@ -12,4 +12,4 @@ FREE_LIMIT = "5"
 PLUS_LIMIT = "300"
 MODEL = "gemini-3.5-flash-lite"
 ENTITLEMENT = "plus"
-# Secrets (never in this file): GEMINI_API_KEY and RC_SECRET, set with `npx wrangler secret put`.
+# Secrets (never in this file): GEMINI_API_KEY, RC_SECRET and ADMIN_TOKEN (the password for /admin), set with `npx wrangler secret put`.
